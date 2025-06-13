@@ -29,10 +29,6 @@ const port = process.env.PLAYWRIGHT_PORT || 37367;
         "--force-device-scale-factor=1.0",
         "--disable-features=DefaultViewportMetaTag",
         "--force-device-width=1440",
-        // Additional args to help with Docker networking
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-        "--disable-gpu",
       ],
     });
 
