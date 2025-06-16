@@ -34,11 +34,17 @@ class PlanStep(BaseModel):
         title (str): The title of the step.
         details (str): The description of the step.
         agent_name (str): The name of the agent responsible for this step.
+        step_type (str): The type of step - either "RegularStep" or "SentinelStep".
+        counter (int or str, optional): For SentinelStep, number of times to repeat checks or descriptive text.
+        sleep_duration (int, optional): For SentinelStep, seconds to sleep between checks.
     """
 
     title: str
     details: str
     agent_name: str
+    step_type: str = "RegularStep"  # Default to RegularStep for backward compatibility
+    counter: Optional[Union[int, str]] = None  # Can be integer or descriptive string
+    sleep_duration: Optional[int] = None
 
 
 class Plan(BaseModel):
@@ -99,6 +105,9 @@ class Plan(BaseModel):
                         title=step.get("title", "Untitled Step"),
                         details=step.get("details", "No details provided."),
                         agent_name=step.get("agent_name", "agent"),
+                        step_type=step.get("step_type", "RegularStep"),
+                        counter=step.get("counter"),
+                        sleep_duration=step.get("sleep_duration"),
                     )
                 )
         return cls(task=task, steps=steps) if steps else None

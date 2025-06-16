@@ -276,13 +276,19 @@ class Orchestrator(BaseGroupChatManager):
         additional_instructions = ""
         if self._config.autonomous_execution:
             additional_instructions = "VERY IMPORTANT: The next agent name cannot be the user or user_proxy, use any other agent."
+        
+        # Get step_type from the plan step, default to "RegularStep" if not present
+        current_step = self._state.plan[step_index]
+        step_type = getattr(current_step, 'step_type', 'RegularStep')
+        
         return ORCHESTRATOR_PROGRESS_LEDGER_PROMPT.format(
             task=task,
             plan=plan,
             step_index=step_index,
-            step_title=self._state.plan[step_index].title,
-            step_details=self._state.plan[step_index].details,
-            agent_name=self._state.plan[step_index].agent_name,
+            step_title=current_step.title,
+            step_details=current_step.details,
+            step_type=step_type,
+            agent_name=current_step.agent_name,
             team=team,
             names=", ".join(names),
             additional_instructions=additional_instructions,
@@ -946,11 +952,21 @@ class Orchestrator(BaseGroupChatManager):
             "title": self._state.plan[self._state.current_step_idx].title,
             "index": self._state.current_step_idx,
             "details": self._state.plan[self._state.current_step_idx].details,
+            "step_type": getattr(self._state.plan[self._state.current_step_idx], 'step_type', 'RegularStep'),
             "agent_name": progress_ledger["instruction_or_question"]["agent_name"],
             "instruction": progress_ledger["instruction_or_question"]["answer"],
             "progress_summary": progress_ledger["progress_summary"],
             "plan_length": len(self._state.plan),
         }
+        
+        # Add SentinelStep-specific fields if applicable
+        current_step = self._state.plan[self._state.current_step_idx]
+        if hasattr(current_step, 'step_type') and current_step.step_type == 'SentinelStep':
+            if hasattr(current_step, 'counter') and current_step.counter is not None:
+                json_step_execution["counter"] = current_step.counter
+            if hasattr(current_step, 'sleep_duration') and current_step.sleep_duration is not None:
+                json_step_execution["sleep_duration"] = current_step.sleep_duration
+
         await self._log_message_agentchat(
             json.dumps(json_step_execution),
             metadata={"internal": "no", "type": "step_execution"},
@@ -1061,11 +1077,21 @@ class Orchestrator(BaseGroupChatManager):
             "title": self._state.plan[self._state.current_step_idx].title,
             "index": self._state.current_step_idx,
             "details": self._state.plan[self._state.current_step_idx].details,
+            "step_type": getattr(self._state.plan[self._state.current_step_idx], 'step_type', 'RegularStep'),
             "agent_name": progress_ledger["instruction_or_question"]["agent_name"],
             "instruction": progress_ledger["instruction_or_question"]["answer"],
             "progress_summary": progress_ledger["progress_summary"],
             "plan_length": len(self._state.plan),
         }
+        
+        # Add SentinelStep-specific fields if applicable
+        current_step = self._state.plan[self._state.current_step_idx]
+        if hasattr(current_step, 'step_type') and current_step.step_type == 'SentinelStep':
+            if hasattr(current_step, 'counter') and current_step.counter is not None:
+                json_step_execution["counter"] = current_step.counter
+            if hasattr(current_step, 'sleep_duration') and current_step.sleep_duration is not None:
+                json_step_execution["sleep_duration"] = current_step.sleep_duration
+
         await self._log_message_agentchat(
             json.dumps(json_step_execution),
             metadata={"internal": "no", "type": "step_execution"},

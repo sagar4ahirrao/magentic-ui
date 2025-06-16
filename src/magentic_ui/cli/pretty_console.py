@@ -232,10 +232,25 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
     if steps:
         print(f"{left}\n{left}{BOLD}Steps:{RESET}")
         for i, step in enumerate(steps, 1):
+            step_type = step.get("step_type", "RegularStep")
+            step_type_color = YELLOW if step_type == "SentinelStep" else GREEN
             print(f"{left}\n{left}{BOLD}{i}. {step.get('title', step)}{RESET}")
+            print(f"{left}{' ' * 3}{BOLD}Type:{RESET} {step_type_color}{step_type}{RESET}")
+            
             if isinstance(step, dict):
                 if step.get("details"):
                     _wrap(step["details"], 5)
+                
+                # Show SentinelStep-specific information
+                if step_type == "SentinelStep":
+                    sentinel_info = []
+                    if step.get("counter"):
+                        sentinel_info.append(f"Counter: {step['counter']}")
+                    if step.get("sleep_duration"):
+                        sentinel_info.append(f"Sleep: {step['sleep_duration']}s")
+                    if sentinel_info:
+                        print(f"{left}{' ' * 5}{BOLD}Monitoring:{RESET} {', '.join(sentinel_info)}")
+                
                 if step.get("instruction"):
                     print(f"{left}{' ' * 5}{BOLD}Instruction:{RESET}")
                     _wrap(step["instruction"], 7)
@@ -254,11 +269,27 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
     # Single‑step orchestrator JSON (title/index style)
     elif {"title", "index", "agent_name"}.issubset(obj):
         idx = obj["index"] + 1 if isinstance(obj.get("index"), int) else obj["index"]
+        step_type = obj.get("step_type", "RegularStep")
+        step_type_color = YELLOW if step_type == "SentinelStep" else GREEN
+        
         print(f"{left}{BOLD}Step:{RESET} {idx}/{obj.get('plan_length', '?')}")
+        print(f"{left}{BOLD}Type:{RESET} {step_type_color}{step_type}{RESET}")
         print(f"{left}{BOLD}Agent:{RESET} {obj['agent_name'].upper()}")
+        
         if obj.get("details"):
             print(f"{left}{BOLD}Details:{RESET}")
             _wrap(obj["details"])
+            
+        # Show SentinelStep-specific information for single step execution
+        if step_type == "SentinelStep":
+            sentinel_info = []
+            if obj.get("counter"):
+                sentinel_info.append(f"Counter: {obj['counter']}")
+            if obj.get("sleep_duration"):
+                sentinel_info.append(f"Sleep: {obj['sleep_duration']}s")
+            if sentinel_info:
+                print(f"{left}{BOLD}Monitoring:{RESET} {', '.join(sentinel_info)}")
+                
         if obj.get("instruction"):
             print(f"{left}{BOLD}Instruction:{RESET}")
             _wrap(obj["instruction"])

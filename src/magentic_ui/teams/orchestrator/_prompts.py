@@ -32,12 +32,40 @@ You have access to the following team members that can help you address the requ
 
 Your plan should should be a sequence of steps that will complete the task.
 
-Each step should have a title and details field.
+## Step Types
+
+There are two types of plan steps:
+
+**[RegularStep]**: Short-term, immediate tasks that complete quickly (within minutes to hours). These are the standard steps that agents can complete in a single execution cycle.
+
+**[SentinelStep]**: Long-running, periodic, or recurring tasks that may take days, weeks, or months to complete. These steps involve:
+- Monitoring conditions over extended time periods
+- Waiting for external events or thresholds to be met
+- Repeatedly checking the same condition until satisfied
+- Tasks that require periodic execution (e.g., "check every day", "monitor constantly")
+
+## How to Classify Steps
+
+Use **[SentinelStep]** when the step involves:
+- Waiting for a condition to be met (e.g., "wait until I have 2000 followers")
+- Continuous monitoring (e.g., "constantly check for new mentions")
+- Periodic tasks (e.g., "check daily", "monitor weekly")
+- Tasks that span extended time periods
+- Tasks with timing dependencies that can't be completed immediately
+
+Use **[RegularStep]** for:
+- Immediate actions (e.g., "send an email", "create a file")
+- One-time information gathering (e.g., "find restaurant menus")
+- Tasks that can be completed in a single execution cycle
+
+Each step should have a title, details, step_type, and agent_name field.
 
 The title should be a short one sentence description of the step.
 
 The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
 The details should start with a brief recap of the title. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
+
+The step_type should be either "SentinelStep" or "RegularStep" based on the classification above.
 
 Example 1:
 
@@ -46,16 +74,19 @@ User request: "Report back the menus of three restaurants near the zipcode 98052
 Step 1:
 - title: "Locate the menu of the first restaurant"
 - details: "Locate the menu of the first restaurant. \n Search for highly-rated restaurants in the 98052 area using Bing, select one with good reviews and an accessible menu, then extract and format the menu information for reporting."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 Step 2:
 - title: "Locate the menu of the second restaurant"
 - details: "Locate the menu of the second restaurant. \n After excluding the first restaurant, search for another well-reviewed establishment in 98052, ensuring it has a different cuisine type for variety, then collect and format its menu information."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 Step 3:
 - title: "Locate the menu of the third restaurant"
 - details: "Locate the menu of the third restaurant. \n Building on the previous searches but excluding the first two restaurants, find a third establishment with a distinct cuisine type, verify its menu is available online, and compile the menu details."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 
@@ -67,36 +98,51 @@ User request: "Execute the starter code for the autogen repo"
 Step 1:
 - title: "Locate the starter code for the autogen repo"
 - details: "Locate the starter code for the autogen repo. \n Search for the official AutoGen repository on GitHub, navigate to their examples or getting started section, and identify the recommended starter code for new users."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 Step 2:
 - title: "Execute the starter code for the autogen repo"
 - details: "Execute the starter code for the autogen repo. \n Set up the Python environment with the correct dependencies, ensure all required packages are installed at their specified versions, and run the starter code while capturing any output or errors."
+- step_type: "RegularStep"
 - agent_name: "coder_agent"
 
 
 Example 3:
 
-User request: "On which social media platform does Autogen have the most followers?"
+User request: "Wait until I have 2000 Instagram followers to send a message to Nike asking for a partnership"
 
 Step 1:
-- title: "Find all social media platforms that Autogen is on"
-- details: "Find all social media platforms that Autogen is on. \n Search for AutoGen's official presence across major platforms like GitHub, Twitter, LinkedIn, and others, then compile a comprehensive list of their verified accounts."
+- title: "Monitor Instagram follower count until reaching 2000 followers"
+- details: "Monitor Instagram follower count until reaching 2000 followers. \n Periodically check the user's Instagram account follower count, sleeping between checks to avoid excessive API calls, and continue monitoring until the 2000 follower threshold is reached."
+- step_type: "SentinelStep"
 - agent_name: "web_surfer"
 
 Step 2:
-- title: "Find the number of followers for each social media platform"
-- details: "Find the number of followers for each social media platform. \n For each platform identified, visit AutoGen's official profile and record their current follower count, ensuring to note the date of collection for accuracy."
+- title: "Send partnership message to Nike"
+- details: "Send partnership message to Nike. \n Once the follower threshold is met, compose and send a professional partnership inquiry message to Nike through their official channels."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
-
-Step 3:
-- title: "Find the number of followers for the remaining social media platform that Autogen is on"
-- details: "Find the number of followers for the remaining social media platforms. \n Visit the remaining platforms and record their follower counts."
-- agent_name: "web_surfer"
-
 
 
 Example 4:
+
+User request: "Constantly check the internet for resources describing Matheus and add these to a local txt file"
+
+Step 1:
+- title: "Periodically search the internet for new resources about Matheus"
+- details: "Periodically search the internet for new resources about Matheus. \n Repeatedly search the web for new articles, posts, or mentions, monitoring for new information over time and identifying resources that haven't been previously collected."
+- step_type: "SentinelStep"
+- agent_name: "web_surfer"
+
+Step 2:
+- title: "Append new resources to a local txt file"
+- details: "Append new resources to a local txt file. \n Each time a new resource is found, add its details to a local txt file, ensuring a cumulative and organized record of relevant resources."
+- step_type: "RegularStep"
+- agent_name: "coder_agent"
+
+
+Example 5:
 
 User request: "Can you paraphrase the following sentence: 'The quick brown fox jumps over the lazy dog'"
 
@@ -110,6 +156,7 @@ Helpful tips:
 - Aim for a plan with the least number of steps possible.
 - Use a search engine or platform to find the information you need. For instance, if you want to look up flight prices, use a flight search engine like Bing Flights. However, your final answer should not stop with a Bing search only.
 - If there are images attached to the request, use them to help you complete the task and describe them to the other agents in the plan.
+- Carefully classify each step as either SentinelStep or RegularStep based on whether it requires long-term monitoring, waiting, or periodic execution.
 
 
 """
@@ -134,12 +181,40 @@ You have access to the following team members that can help you address the requ
 
 Your plan should should be a sequence of steps that will complete the task.
 
-Each step should have a title and details field.
+## Step Types
+
+There are two types of plan steps:
+
+**[RegularStep]**: Short-term, immediate tasks that complete quickly (within minutes to hours). These are the standard steps that agents can complete in a single execution cycle.
+
+**[SentinelStep]**: Long-running, periodic, or recurring tasks that may take days, weeks, or months to complete. These steps involve:
+- Monitoring conditions over extended time periods
+- Waiting for external events or thresholds to be met
+- Repeatedly checking the same condition until satisfied
+- Tasks that require periodic execution (e.g., "check every day", "monitor constantly")
+
+## How to Classify Steps
+
+Use **[SentinelStep]** when the step involves:
+- Waiting for a condition to be met (e.g., "wait until I have 2000 followers")
+- Continuous monitoring (e.g., "constantly check for new mentions")
+- Periodic tasks (e.g., "check daily", "monitor weekly")
+- Tasks that span extended time periods
+- Tasks with timing dependencies that can't be completed immediately
+
+Use **[RegularStep]** for:
+- Immediate actions (e.g., "send an email", "create a file")
+- One-time information gathering (e.g., "find restaurant menus")
+- Tasks that can be completed in a single execution cycle
+
+Each step should have a title, details, step_type, and agent_name field.
 
 The title should be a short one sentence description of the step.
 
 The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
 The details should start with a brief recap of the title. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
+
+The step_type should be either "SentinelStep" or "RegularStep" based on the classification above.
 
 
 Example 1:
@@ -149,16 +224,19 @@ User request: "Report back the menus of three restaurants near the zipcode 98052
 Step 1:
 - title: "Locate the menu of the first restaurant"
 - details: "Locate the menu of the first restaurant. \n Search for top-rated restaurants in the 98052 area, select one with good reviews and an accessible menu, then extract and format the menu information."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 Step 2:
 - title: "Locate the menu of the second restaurant"
 - details: "Locate the menu of the second restaurant. \n After excluding the first restaurant, search for another well-reviewed establishment in 98052, ensuring it has a different cuisine type for variety, then collect and format its menu information."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 Step 3:
 - title: "Locate the menu of the third restaurant"
 - details: "Locate the menu of the third restaurant. \n Building on the previous searches but excluding the first two restaurants, find a third establishment with a distinct cuisine type, verify its menu is available online, and compile the menu details."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 
@@ -170,33 +248,32 @@ User request: "Execute the starter code for the autogen repo"
 Step 1:
 - title: "Locate the starter code for the autogen repo"
 - details: "Locate the starter code for the autogen repo. \n Search for the official AutoGen repository on GitHub, navigate to their examples or getting started section, and identify the recommended starter code for new users."
+- step_type: "RegularStep"
 - agent_name: "web_surfer"
 
 Step 2:
 - title: "Execute the starter code for the autogen repo"
 - details: "Execute the starter code for the autogen repo. \n Set up the Python environment with the correct dependencies, ensure all required packages are installed at their specified versions, and run the starter code while capturing any output or errors."
+- step_type: "RegularStep"
 - agent_name: "coder_agent"
 
 
 
 Example 3:
 
-User request: "On which social media platform does Autogen have the most followers?"
+User request: "Constantly check the internet for resources describing Matheus Kunzler Maldaner and add these to a local txt file"
 
 Step 1:
-- title: "Find all social media platforms that Autogen is on"
-- details: "Find all social media platforms that Autogen is on. \n Search for AutoGen's official presence across major platforms like GitHub, Twitter, LinkedIn, and others, then compile a comprehensive list of their verified accounts."
+- title: "Periodically search the internet for new resources about Matheus Kunzler Maldaner"
+- details: "Periodically search the internet for new resources about Matheus Kunzler Maldaner. \n Repeatedly search the web for new articles, posts, or mentions, monitoring for new information over time and identifying resources that haven't been previously collected."
+- step_type: "SentinelStep"
 - agent_name: "web_surfer"
 
 Step 2:
-- title: "Find the number of followers for each social media platform"
-- details: "Find the number of followers for each social media platform. \n For each platform identified, visit AutoGen's official profile and record their current follower count, ensuring to note the date of collection for accuracy."
-- agent_name: "web_surfer"
-
-Step 3:
-- title: "Find the number of followers for the remaining social media platform that Autogen is on"
-- details: "Find the number of followers for the remaining social media platforms. \n Visit the remaining platforms and record their follower counts."
-- agent_name: "web_surfer"
+- title: "Append new resources to a local txt file"
+- details: "Append new resources to a local txt file. \n Each time a new resource is found, add its details to a local txt file, ensuring a cumulative and organized record of relevant resources."
+- step_type: "RegularStep"
+- agent_name: "coder_agent"
 
 
 
@@ -205,6 +282,7 @@ Helpful tips:
 - Aim for a plan with the least number of steps possible.
 - Use a search engine or platform to find the information you need. For instance, if you want to look up flight prices, use a flight search engine like Bing Flights. However, your final answer should not stop with a Bing search only.
 - If there are images attached to the request, use them to help you complete the task and describe them to the other agents in the plan.
+- Carefully classify each step as either SentinelStep or RegularStep based on whether it requires long-term monitoring, waiting, or periodic execution.
 
 """
 
@@ -222,6 +300,32 @@ Remember, there is no requirement to involve all team members -- a team member's
 
 
 Your plan should should be a sequence of steps that will complete the task.
+
+## Step Types
+
+There are two types of plan steps:
+
+**[RegularStep]**: Short-term, immediate tasks that complete quickly (within minutes to hours). These are the standard steps that agents can complete in a single execution cycle.
+
+**[SentinelStep]**: Long-running, periodic, or recurring tasks that may take days, weeks, or months to complete. These steps involve:
+- Monitoring conditions over extended time periods
+- Waiting for external events or thresholds to be met
+- Repeatedly checking the same condition until satisfied
+- Tasks that require periodic execution (e.g., "check every day", "monitor constantly")
+
+## How to Classify Steps
+
+Use **[SentinelStep]** when the step involves:
+- Waiting for a condition to be met (e.g., "wait until I have 2000 followers")
+- Continuous monitoring (e.g., "constantly check for new mentions")
+- Periodic tasks (e.g., "check daily", "monitor weekly")
+- Tasks that span extended time periods
+- Tasks with timing dependencies that can't be completed immediately
+
+Use **[RegularStep]** for:
+- Immediate actions (e.g., "send an email", "create a file")
+- One-time information gathering (e.g., "find restaurant menus")
+- Tasks that can be completed in a single execution cycle
 
 Each step should have a title and details field.
 
@@ -248,11 +352,15 @@ The JSON object should have the following structure
 {{
     "title": "title of step 1",
     "details": "recap the title in one short sentence \n remaining details of step 1",
+    "step_type": "RegularStep or SentinelStep based on the classification above",
+    "counter": "number of times to repeat this step",
     "agent_name": "the name of the agent that should complete the step"
 }},
 {{
     "title": "title of step 2",
     "details": "recap the title in one short sentence \n remaining details of step 2",
+    "step_type": "RegularStep or SentinelStep based on the classification above",
+    "counter": "number of times to repeat this step",
     "agent_name": "the name of the agent that should complete the step"
 }},
 ...
@@ -275,6 +383,8 @@ The plan we have tried to complete is:
 We have not been able to make progress on our task.
 
 We need to find a new plan to tackle the task that addresses the failures in trying to complete the task previously.
+
+When creating the new plan, make sure to properly classify each step as either RegularStep or SentinelStep based on whether it requires long-term monitoring, waiting, or periodic execution.
 """
     + ORCHESTRATOR_PLAN_PROMPT_JSON
 )
@@ -440,6 +550,9 @@ def validate_plan_json(json_response: Dict[str, Any]) -> bool:
     for item in plan:
         if not isinstance(item, dict):
             return False
-        if "title" not in item or "details" not in item or "agent_name" not in item:
+        if "title" not in item or "details" not in item or "agent_name" not in item or "step_type" not in item:
+            return False
+        # Validate step_type is one of the allowed values
+        if item["step_type"] not in ["RegularStep", "SentinelStep"]:
             return False
     return True
