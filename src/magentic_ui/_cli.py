@@ -20,6 +20,13 @@ from .agents.mcp._config import McpAgentConfig
 from .magentic_ui_config import MagenticUIConfig, ModelClientConfigs
 from .types import RunPaths
 from .utils import LLMCallFilter
+from ._docker import (
+    check_docker_running,
+    check_browser_image,
+    check_python_image,
+    build_browser_image,
+    build_python_image,
+)
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -119,6 +126,9 @@ async def get_team(
     answer: str | None = None,
     mcp_agents: List[McpAgentConfig] | None = None,
     use_pretty_ui: bool = True,
+    run_without_docker: bool = False,
+    browser_headless: bool = False,
+    sentinel_tasks: bool = False,
 ) -> None:
     log_debug("=== Starting get_team function ===", debug)
     log_debug(
@@ -222,9 +232,10 @@ async def get_team(
 
     magentic_ui_config = MagenticUIConfig(
         model_client_configs=model_client_configs,
-        approval_policy=action_policy,
+        mcp_agent_configs=mcp_agents,
         cooperative_planning=cooperative_planning,
         autonomous_execution=autonomous_execution,
+        approval_policy=action_policy,
         allow_for_replans=True,
         do_bing_search=False,
         model_context_token_limit=model_context_token_limit,
@@ -237,7 +248,9 @@ async def get_team(
         hints=hints,
         answer=answer,
         inside_docker=inside_docker,
-        mcp_agent_configs=mcp_agents,
+        sentinel_tasks=sentinel_tasks,
+        run_without_docker=run_without_docker,
+        browser_headless=browser_headless,
     )
     log_debug(
         f"MagenticUIConfig created with planning={cooperative_planning}, execution={autonomous_execution}",
@@ -270,7 +283,7 @@ async def get_team(
             with open(state_file, "r") as f:
                 state = json.load(f)
                 log_debug("State loaded successfully", debug)
-                # print("State: ", state)
+
             log_debug("Calling team.load_state with loaded state", debug)
             await team.load_state(state)
             log_debug("State loading completed", debug)
@@ -366,6 +379,20 @@ def main() -> None:
         type=str,
         default=None,
         help="Path to the configuration file (default: 'config.yaml')",
+    )
+    parser.add_argument(
+        "--run-without-docker",
+        dest="run_without_docker",
+        action="store_true",
+        default=False,
+        help="Run without docker. This will remove coder and filesurfer agents and disable live browser view.",
+    )
+    parser.add_argument(
+        "--headless",
+        dest="browser_headless",
+        action="store_true",
+        default=False,
+        help="Run browser in headless mode (default: False, browser runs with GUI)",
     )
     parser.add_argument(
         "--debug",
@@ -510,6 +537,13 @@ def main() -> None:
         default=True,
         help="Use the old console without fancy formatting (default: use pretty terminal)",
     )
+    advanced.add_argument(
+        "--sentinel-tasks",
+        dest="sentinel_tasks",
+        action="store_true",
+        default=False,
+        help="Use sentinel tasks to guide the agent's behavior (default: False)",
+    )
     args = parser.parse_args()
     log_debug(f"Command line arguments parsed: debug={args.debug}", args.debug)
 
@@ -526,9 +560,11 @@ def main() -> None:
         log_debug(f"Config file: {args.config}", args.debug)
         log_debug(f"User proxy type: {args.user_proxy_type}", args.debug)
         log_debug(f"LLM log directory: {args.llmlog_dir}", args.debug)
+        log_debug(f"Sentinel tasks: {args.sentinel_tasks}", args.debug)
         log_debug(
             f"Console mode: {'Pretty' if args.use_pretty_ui else 'Old'}", args.debug
         )
+        log_debug(f"Browser headless: {args.browser_headless}", args.debug)
 
     # Validate user proxy type
     log_debug("Validating user proxy type", args.debug)
@@ -600,6 +636,43 @@ def main() -> None:
             log_debug(
                 f"Task from argument, length: {len(task if task else '')}", args.debug
             )
+
+    if not args.run_without_docker:
+        # Check Docker and build images if necessary
+        log_debug("Checking Docker setup...", args.debug)
+        logger.info("Checking if Docker is running...")
+
+        if not check_docker_running():
+            logger.error("Docker is not running. Please start Docker and try again.")
+            sys.exit(1)
+        else:
+            logger.success("Docker is running")
+
+        # Check and build Docker images if needed
+        logger.info("Checking Docker vnc browser image...")
+        if not check_browser_image():
+            logger.warning("VNC browser image needs to be built")
+            logger.info("Building Docker vnc image (this WILL take a few minutes)")
+            build_browser_image()
+        else:
+            logger.success("VNC browser image is available")
+
+        logger.info("Checking Docker python image...")
+        if not check_python_image():
+            logger.warning("Python image needs to be built")
+            logger.info("Building Docker python image (this WILL take a few minutes)")
+            build_python_image()
+        else:
+            logger.success("Python image is available")
+
+        # Verify Docker images exist after attempted build
+        if not check_browser_image() or not check_python_image():
+            logger.error(
+                "Docker images not found. Please build the images and try again."
+            )
+            sys.exit(1)
+
+        log_debug("Docker setup completed successfully", args.debug)
 
     log_debug("Processing final answer prompt", args.debug)
     final_answer_prompt: str | None = None
@@ -689,6 +762,9 @@ def main() -> None:
             answer=args.metadata_answer if args.user_proxy_type == "metadata" else None,
             use_pretty_ui=args.use_pretty_ui,
             mcp_agents=mcp_agents,
+            run_without_docker=args.run_without_docker,
+            browser_headless=args.browser_headless,
+            sentinel_tasks=args.sentinel_tasks,
         )
     )
     log_debug("Asyncio event loop and get_team function completed", args.debug)
