@@ -50,12 +50,13 @@ class SentinelPlanStep(PlanStep):
         details (str): The description of the step.
         agent_name (str): The name of the agent responsible for this step.
         sleep_duration (int): Seconds to wait between checks.
-        counter (Union[int, Literal["indefinite", "until_condition_met"]]): 
-            Number of iterations or termination condition.
+        condition (Union[int, str]): Either:
+            - An integer indicating number of iterations to perform
+            - A string describing the condition to check for completion
     """
     
     sleep_duration: int
-    counter: Union[int, Literal["indefinite", "until_condition_met"]]
+    condition: Union[int, str]
 
 
 class Plan(BaseModel):
@@ -90,8 +91,8 @@ class Plan(BaseModel):
         for i, step in enumerate(self.steps):
             plan_str += f"{i}. {step.agent_name}: {step.title}\n   {step.details}\n"
             if isinstance(step, SentinelPlanStep):
-                counter_str = str(step.counter)
-                plan_str += f"   [Sentinel: every {step.sleep_duration}s, {counter_str}]\n"
+                condition_str = str(step.condition)
+                plan_str += f"   [Sentinel: every {step.sleep_duration}s, condition: {condition_str}]\n"
         return plan_str
 
     def model_dump(self, **kwargs) -> Dict[str, Any]:
@@ -139,7 +140,7 @@ class Plan(BaseModel):
                             details=step.get("details", "No details provided."),
                             agent_name=step.get("agent_name", "agent"),
                             sleep_duration=step.get("sleep_duration", 0),
-                            counter=step.get("counter", "indefinite"),
+                            condition=step.get("condition", "indefinite"),
                         )
                     )
                 else:

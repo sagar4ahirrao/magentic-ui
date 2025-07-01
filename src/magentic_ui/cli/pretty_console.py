@@ -211,9 +211,9 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
                     )
                     print(f"{left}{' ' * 5}{BOLD}Type:{RESET} {type_name}")
                     if step_type == "SentinelPlanStep":
-                        if step.get("counter"):
+                        if step.get("condition"):
                             print(
-                                f"{left}{' ' * 5}{BOLD}Counter:{RESET} {step['counter']}"
+                                f"{left}{' ' * 5}{BOLD}Condition:{RESET} {step['condition']}"
                             )
                         if step.get("sleep_duration"):
                             print(
@@ -251,8 +251,8 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
             type_name = "Regular Step" if step_type == "PlanStep" else "Sentinel Step"
             print(f"{left}{BOLD}Type:{RESET} {type_name}")
             if step_type == "SentinelPlanStep":
-                if obj.get("counter"):
-                    print(f"{left}    {BOLD}Counter:{RESET} {obj['counter']}")
+                if obj.get("condition"):
+                    print(f"{left}    {BOLD}Condition:{RESET} {obj['condition']}")
                 if obj.get("sleep_duration"):
                     print(
                         f"{left}    {BOLD}Sleep Duration:{RESET} {obj['sleep_duration']}s"
