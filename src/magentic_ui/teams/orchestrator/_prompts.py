@@ -110,11 +110,14 @@ def get_orchestrator_system_message_planning(
             - Periodic tasks (e.g., "check daily", "monitor weekly")
             - Tasks that span extended time periods
             - Tasks with timing dependencies that can't be completed immediately
+            - An action that repeats a specific number of times (e.g., "check 5 times with 30s between each check")
 
             Use **PlanStep** for:
             - Immediate actions (e.g., "send an email", "create a file")
             - One-time information gathering (e.g., "find restaurant menus")
             - Tasks that can be completed in a single execution cycle
+
+            IMPORTANT: If a task needs to be repeated multiple times (e.g., "5 times with 23s between each"), you MUST use ONE SentinelPlanStep with the appropriate condition value, NOT multiple regular steps. The condition parameter handles repetition automatically.
 
             Each step should have a title, details, step_type, and agent_name field.
 
@@ -203,7 +206,7 @@ def get_orchestrator_system_message_planning(
 
             Example 4:
 
-            User request: "Browse to the magentic-ui GitHub repository a total of 5 times and report the number of stars at each check"
+            User request: "Browse to the magentic-ui GitHub repository a total of 5 times and report the number of stars at each check. Sleep 30 seconds between each check."
 
             Step 1:
             - title: "Monitor GitHub repository stars with 5 repeated checks"
@@ -220,7 +223,25 @@ def get_orchestrator_system_message_planning(
             - agent_name: "coder_agent"
 
 
+            IMPORTANT: This example shows how to handle repeated actions with a specific count. Notice how a single SentinelPlanStep is used rather than multiple steps - the condition value (5) controls how many times it repeats.
+
+
             Example 5:
+
+            User request: "Check Bing 5 times with a 30 second wait between each check for updates about SpaceX"
+            
+            Step 1:
+            - title: "Monitor Bing for SpaceX updates with 5 repeated checks"
+            - details: "Monitor Bing for SpaceX updates with 5 repeated checks. \\n Search Bing for SpaceX news and updates 5 times with 30 seconds between each search, collecting all new information found during the monitoring period."
+            - step_type: "SentinelPlanStep"
+            - agent_name: "web_surfer"
+            - sleep_duration: 30
+            - condition: 5
+            
+            IMPORTANT: Notice in Example 5, a single SentinelPlanStep is used to perform an action 5 times. DO NOT create multiple separate SentinelPlanSteps for repeated iterations - use a single step with the appropriate condition value. The condition parameter controls how many times the action repeats.
+
+
+            Example 6:
 
             User request: "Can you paraphrase the following sentence: 'The quick brown fox jumps over the lazy dog'"
 
