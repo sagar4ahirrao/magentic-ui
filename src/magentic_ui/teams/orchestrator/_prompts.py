@@ -908,21 +908,22 @@ def validate_plan_json(
             return False
 
         if sentinel_tasks_enabled:
-            # SentinelPlanStep requires step_type
+            # SentinelPlanStep requires sleep_duration and condition
             if (
                 "title" not in item
                 or "details" not in item
                 or "agent_name" not in item
-                or "step_type" not in item
                 or "sleep_duration" not in item
                 or "condition" not in item
             ):
                 return False
-            # Validate step_type is one of the allowed values
-            if item["step_type"] not in ["PlanStep", "SentinelPlanStep"]:
-                return False
+            
         else:
-            # PlanStep doesn't require step_type
-            if "title" not in item or "details" not in item or "agent_name" not in item:
+            # PlanStep does not require sleep_duration or condition
+            if (
+                "title" not in item
+                or "details" not in item
+                or "agent_name" not in item
+            ):
                 return False
     return True
