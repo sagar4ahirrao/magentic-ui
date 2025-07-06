@@ -119,9 +119,17 @@ def get_orchestrator_system_message_planning(
 
             IMPORTANT: If a task needs to be repeated multiple times (e.g., "5 times with 23s between each"), you MUST use ONE SentinelPlanStep with the appropriate condition value, NOT multiple regular steps. The condition parameter handles repetition automatically.
 
-            Each step should have a title, details, step_type, and agent_name field.
+            Each step should have a title, details, and agent_name field.
 
-            For **SentinelPlanStep** only, you should also include:
+            - The title should be a short one sentence description of the step.
+
+            - The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
+            - The details should start with a brief recap of the title. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
+
+            - The agent_name should be the name of the agent that will execute the step. The agent_name should be one of the team members listed above.
+
+            For **SentinelPlanStep** ONLY, you should also include step_type, sleep_duration and condition fields:
+            - **step_type** (string): Should be "SentinelPlanStep".
             - **sleep_duration** (integer): Number of seconds to wait between checks. Intelligently extract timing from the user's request:
               * Explicit timing: "every 5 seconds" → 5, "check hourly" → 3600, "daily monitoring" → 86400
               * Contextual defaults based on task type:
@@ -137,12 +145,9 @@ def get_orchestrator_system_message_planning(
               * String: Natural language description of the completion condition (e.g., "until star count reaches 2000")
               * If not specified, use a descriptive condition from the task
 
-            The title should be a short one sentence description of the step.
-
-            The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
-            The details should start with a brief recap of the title. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
-
-            The step_type should be either "SentinelPlanStep" or "PlanStep" based on the classification above."""
+            For **PlanStep** you should NOT include step_type, sleep_duration or condition fields, only title, details, and agent_name.
+            
+            """
 
         examples_section = """
 
@@ -153,19 +158,16 @@ def get_orchestrator_system_message_planning(
             Step 1:
             - title: "Locate the menu of the first restaurant"
             - details: "Locate the menu of the first restaurant. \\n Search for highly-rated restaurants in the 98052 area using Bing, select one with good reviews and an accessible menu, then extract and format the menu information for reporting."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Step 2:
             - title: "Locate the menu of the second restaurant"
             - details: "Locate the menu of the second restaurant. \\n After excluding the first restaurant, search for another well-reviewed establishment in 98052, ensuring it has a different cuisine type for variety, then collect and format its menu information."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Step 3:
             - title: "Locate the menu of the third restaurant"
             - details: "Locate the menu of the third restaurant. \\n Building on the previous searches but excluding the first two restaurants, find a third establishment with a distinct cuisine type, verify its menu is available online, and compile the menu details."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
 
@@ -176,13 +178,11 @@ def get_orchestrator_system_message_planning(
             Step 1:
             - title: "Locate the starter code for the autogen repo"
             - details: "Locate the starter code for the autogen repo. \\n Search for the official AutoGen repository on GitHub, navigate to their examples or getting started section, and identify the recommended starter code for new users."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Step 2:
             - title: "Execute the starter code for the autogen repo"
             - details: "Execute the starter code for the autogen repo. \\n Set up the Python environment with the correct dependencies, ensure all required packages are installed at their specified versions, and run the starter code while capturing any output or errors."
-            - step_type: "PlanStep"
             - agent_name: "coder_agent"
 
 
@@ -193,15 +193,14 @@ def get_orchestrator_system_message_planning(
             Step 1:
             - title: "Monitor Instagram follower count until reaching 2000 followers"
             - details: "Monitor Instagram follower count until reaching 2000 followers. \\n Periodically check the user's Instagram account follower count, sleeping between checks to avoid excessive API calls, and continue monitoring until the 2000 follower threshold is reached."
+            - agent_name: "web_surfer"
             - step_type: "SentinelPlanStep"
             - sleep_duration: 600
             - condition: "until_condition_met"
-            - agent_name: "web_surfer"
 
             Step 2:
             - title: "Send partnership message to Nike"
             - details: "Send partnership message to Nike. \\n Once the follower threshold is met, compose and send a professional partnership inquiry message to Nike through their official channels."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Example 4:
@@ -211,15 +210,15 @@ def get_orchestrator_system_message_planning(
             Step 1:
             - title: "Monitor GitHub repository stars with 5 repeated checks"
             - details: "Monitor GitHub repository stars with 5 repeated checks. \\n Visit the magentic-ui GitHub repository 5 times, recording the star count at each visit and compiling a report of all star counts collected during the monitoring period."
+            - agent_name: "web_surfer"
             - step_type: "SentinelPlanStep"
             - sleep_duration: 0
             - condition: 5
-            - agent_name: "web_surfer"
+            
 
             Step 2:
             - title: "Say hi to the user using code"
             - details: "Say hi to the user using the coder agent. \\n Execute code to generate a greeting message."
-            - step_type: "PlanStep"
             - agent_name: "coder_agent"
 
 
@@ -233,8 +232,8 @@ def get_orchestrator_system_message_planning(
             Step 1:
             - title: "Monitor Bing for SpaceX updates with 5 repeated checks"
             - details: "Monitor Bing for SpaceX updates with 5 repeated checks. \\n Search Bing for SpaceX news and updates 5 times with 30 seconds between each search, collecting all new information found during the monitoring period."
-            - step_type: "SentinelPlanStep"
             - agent_name: "web_surfer"
+            - step_type: "SentinelPlanStep"
             - sleep_duration: 30
             - condition: 5
             
@@ -249,7 +248,7 @@ def get_orchestrator_system_message_planning(
 
 
             Helpful tips:
-            - If the plan needs information from the user, try to get that information before creating the plan.
+            - If the plan needs information from the user, get that information BEFORE devising a plan to minimize user friction.
             - When creating the plan you only need to add a step to the plan if it requires a different agent to be completed, or if the step is very complicated and can be split into two steps.
             - Remember, there is no requirement to involve all team members -- a team member's particular expertise may not be needed for this task.
             - Aim for a plan with the least number of steps possible.
@@ -257,6 +256,9 @@ def get_orchestrator_system_message_planning(
             - If there are images attached to the request, use them to help you complete the task and describe them to the other agents in the plan.
             - Carefully classify each step as either SentinelPlanStep or PlanStep based on whether it requires long-term monitoring, waiting, or periodic execution.
             - For SentinelPlanStep timing: Always analyze the user's request for timing clues ("daily", "every hour", "constantly", "until X happens") and choose appropriate sleep_duration and condition values. Consider the nature of the task to avoid being too aggressive with checking frequency.
+            - As a reminder, PlanStep steps are for immediate actions that can be completed quickly, while SentinelPlanStep steps are for long-running tasks that require monitoring or periodic checks.
+            - PlanStep takes 3 fields: title, details, and agent_name.
+            - SentinelPlanStep takes 6 fields: title, details, agent_name, step_type, sleep_duration, and condition.
         """
 
     else:
@@ -617,17 +619,67 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
 
             ## How to Classify Steps
 
-            Use **[SentinelPlanStep]** when the step involves:
+            Use **SentinelPlanStep** when the step involves:
             - Waiting for a condition to be met (e.g., "wait until I have 2000 followers")
             - Continuous monitoring (e.g., "constantly check for new mentions")
             - Periodic tasks (e.g., "check daily", "monitor weekly")
             - Tasks that span extended time periods
             - Tasks with timing dependencies that can't be completed immediately
+            - An action that repeats a specific number of times (e.g., "check 5 times with 30s between each check")
 
-            Use **[PlanStep]** for:
+            Use **PlanStep** for:
             - Immediate actions (e.g., "send an email", "create a file")
             - One-time information gathering (e.g., "find restaurant menus")
-            - Tasks that can be completed in a single execution cycle"""
+            - Tasks that can be completed in a single execution cycle
+
+            IMPORTANT: If a task needs to be repeated multiple times (e.g., "5 times with 23s between each"), you MUST use ONE SentinelPlanStep with the appropriate condition value, NOT multiple regular steps. The condition parameter handles repetition automatically.
+
+            Each step should have a title, details, and agent_name field.
+
+            - The title should be a short one sentence description of the step.
+
+            - The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
+            - The details should start with a brief recap of the title. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
+
+            - The agent_name should be the name of the agent that will execute the step. The agent_name should be one of the team members listed above.
+
+            For **SentinelPlanStep** ONLY, you should also include step_type, sleep_duration and condition fields:
+            - **step_type** (string): Should be "SentinelPlanStep".
+            - **sleep_duration** (integer): Number of seconds to wait between checks. Intelligently extract timing from the user's request:
+              * Explicit timing: "every 5 seconds" → 5, "check hourly" → 3600, "daily monitoring" → 86400
+              * Contextual defaults based on task type:
+                - Social media monitoring: 300-900 seconds (5-15 minutes)
+                - Stock/price monitoring: 60-300 seconds (1-5 minutes) 
+                - System health checks: 30-60 seconds
+                - Web content changes: 600-3600 seconds (10 minutes-1 hour)
+                - General "constantly": 60-300 seconds
+                - General "periodically": 300-1800 seconds (5-30 minutes)
+              * If no timing specified, choose based on context and avoid being too aggressive to prevent rate limiting
+            - **condition** (integer or string): Either:
+              * Integer: Specific number of times to execute (e.g., "check 5 times" → 5)
+              * String: Natural language description of the completion condition (e.g., "until star count reaches 2000")
+              * If not specified, use a descriptive condition from the task
+
+            For **PlanStep** you should NOT include step_type, sleep_duration or condition fields, only title, details, and agent_name.
+            """
+
+        description_section = """
+    
+            Each step should have a title, details and agent_name fields.
+
+            The title should be a short one sentence description of the step.
+
+            The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
+            The details should start with a brief recap of the title in one short sentence. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
+            The details should not be longer that 2 sentences.
+
+            Output an answer in pure JSON format according to the following schema. The JSON object must be parsable as-is. DO NOT OUTPUT ANYTHING OTHER THAN JSON, AND DO NOT DEVIATE FROM THIS SCHEMA:
+
+            The JSON object for a mixed plan with SentinelPlanStep and PlanStep should have the following structure:
+
+            Note that in the structure below, the "step_type", "condition" and "sleep_duration" fields are only present for SentinelPlanStep steps, and not for PlanStep steps. 
+
+        """
 
         json_schema = """
         {{
@@ -640,18 +692,23 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
             {{
                 "title": "title of step 1",
                 "details": "recap the title in one short sentence \\n remaining details of step 1",
-                "step_type": "PlanStep or SentinelPlanStep based on the classification above",
+                "agent_name": "the name of the agent that should complete the step"
+                "step_type": "SentinelPlanStep",
                 "condition": "number of times to repeat this step or a description of the completion condition",
                 "sleep_duration": "amount of time represented in seconds to sleep between each iteration of the step",
-                "agent_name": "the name of the agent that should complete the step"
             }},
             {{
                 "title": "title of step 2",
                 "details": "recap the title in one short sentence \\n remaining details of step 2",
+                "agent_name": "the name of the agent that should complete the step"                
                 "step_type": "PlanStep or SentinelPlanStep based on the classification above",
                 "condition": "number of times to repeat this step or a description of the completion condition",
                 "sleep_duration": "amount of time represented in seconds to sleep between each iteration of the step",
-                "agent_name": "the name of the agent that should complete the step"
+            }},
+            {{
+                "title": "title of step 3",
+                "details": "recap the title in one short sentence \\n remaining details of step 3",
+                "agent_name": "the name of the agent that should complete the step",
             }},
             ...
             ]
@@ -660,6 +717,24 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
     else:
         # Use old format without SentinelPlanStep functionality
         step_types_section = ""
+
+        description_section = """
+    
+            Each step should have a title, details and agent_name fields.
+
+            The title should be a short one sentence description of the step.
+
+            The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
+            The details should start with a brief recap of the title in one short sentence. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
+            The details should not be longer that 2 sentences.
+
+            The agent_name should be the name of the agent that will execute the step. The agent_name should be one of the team members listed above.
+
+            Output an answer in pure JSON format according to the following schema. The JSON object must be parsable as-is. DO NOT OUTPUT ANYTHING OTHER THAN JSON, AND DO NOT DEVIATE FROM THIS SCHEMA:
+
+            The JSON object should have the following structure:
+
+        """
 
         json_schema = """{{
             "response": "a complete response to the user request for Case 1.",
@@ -682,21 +757,7 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
             ]
         }}"""
 
-    description_section = """
     
-        Each step should have a title and details field.
-
-        The title should be a short one sentence description of the step.
-
-        The details should be a detailed description of the step. The details should be concise and directly describe the action to be taken.
-        The details should start with a brief recap of the title in one short sentence. We then follow it with a new line. We then add any additional details without repeating information from the title. We should be concise but mention all crucial details to allow the human to verify the step.
-        The details should not be longer that 2 sentences.
-
-        Output an answer in pure JSON format according to the following schema. The JSON object must be parsable as-is. DO NOT OUTPUT ANYTHING OTHER THAN JSON, AND DO NOT DEVIATE FROM THIS SCHEMA:
-
-        The JSON object should have the following structure
-
-        """
 
     return f"""
     
@@ -907,17 +968,27 @@ def validate_plan_json(
         if not isinstance(item, dict):
             return False
 
+        # SentinelPlanStep requires sleep_duration and condition
         if sentinel_tasks_enabled:
-            # SentinelPlanStep requires sleep_duration and condition
-            if (
-                "title" not in item
-                or "details" not in item
-                or "agent_name" not in item
-                or "sleep_duration" not in item
-                or "condition" not in item
-            ):
-                return False
-            
+            # this means it is a PlanStep since it doesn't have the step_type field
+            if "step_type" not in item: 
+                if (
+                    "title" not in item
+                    or "details" not in item
+                    or "agent_name" not in item
+                ):
+                    return False
+            elif item["step_type"] == "SentinelPlanStep":
+                # SentinelPlanStep requires sleep_duration and condition
+                if (
+                    "title" not in item
+                    or "details" not in item
+                    or "agent_name" not in item
+                    or "sleep_duration" not in item
+                    or "condition" not in item
+                ):
+                    return False
+        # If we are not in sentinel tasks mode    
         else:
             # PlanStep does not require sleep_duration or condition
             if (
