@@ -757,8 +757,6 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
             ]
         }}"""
 
-    
-
     return f"""
     
     {base_prompt}
@@ -971,7 +969,7 @@ def validate_plan_json(
         # SentinelPlanStep requires sleep_duration and condition
         if sentinel_tasks_enabled:
             # this means it is a PlanStep since it doesn't have the step_type field
-            if "step_type" not in item: 
+            if "step_type" not in item:
                 if (
                     "title" not in item
                     or "details" not in item
@@ -988,13 +986,9 @@ def validate_plan_json(
                     or "condition" not in item
                 ):
                     return False
-        # If we are not in sentinel tasks mode    
+        # If we are not in sentinel tasks mode
         else:
             # PlanStep does not require sleep_duration or condition
-            if (
-                "title" not in item
-                or "details" not in item
-                or "agent_name" not in item
-            ):
+            if "title" not in item or "details" not in item or "agent_name" not in item:
                 return False
     return True

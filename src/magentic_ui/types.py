@@ -1,5 +1,5 @@
 import json
-from typing import Optional, List, Dict, Sequence, Union, Any, Literal
+from typing import Optional, List, Dict, Sequence, Union, Any
 from autogen_agentchat.messages import BaseAgentEvent
 from pydantic import BaseModel
 from dataclasses import dataclass
@@ -54,7 +54,7 @@ class SentinelPlanStep(PlanStep):
             - An integer indicating number of iterations to perform
             - A string describing the condition to check for completion
     """
-    
+
     sleep_duration: int
     condition: Union[int, str]
 
@@ -99,7 +99,7 @@ class Plan(BaseModel):
         """Override model_dump to include step_type in serialized output."""
         result = super().model_dump(**kwargs)
         steps_data = []
-        
+
         for step in self.steps:
             step_data = step.model_dump()
             if isinstance(step, SentinelPlanStep):
@@ -107,7 +107,7 @@ class Plan(BaseModel):
             else:
                 step_data["step_type"] = "PlanStep"
             steps_data.append(step_data)
-            
+
         result["steps"] = steps_data
         return result
 
@@ -131,9 +131,12 @@ class Plan(BaseModel):
         for raw_step in plan_dict:
             if isinstance(raw_step, dict):
                 step: dict[str, Any] = raw_step  # type: ignore
-                
+
                 # Check if this is a sentinel step based on step_type field
-                if step.get("step_type", "") == "SentinelPlanStep" and "sleep_duration" in step:
+                if (
+                    step.get("step_type", "") == "SentinelPlanStep"
+                    and "sleep_duration" in step
+                ):
                     steps.append(
                         SentinelPlanStep(
                             title=step.get("title", "Untitled Step"),
