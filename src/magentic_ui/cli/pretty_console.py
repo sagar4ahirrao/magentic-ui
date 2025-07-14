@@ -49,6 +49,10 @@ def _terminal_width(fallback: int = 100) -> int:
 def try_parse_json(raw: str) -> tuple[bool, Any]:
     """Lightweight JSON detector – avoids `json.loads` when blatantly not JSON."""
     raw = raw.strip()
+    # If it's a Python-style list (web_surfer output), skip JSON parsing and print a hint
+    if raw.startswith("[") and ", <autogen_core._image.Image object" in raw:
+        # print(f"{YELLOW}[Screenshot captured]{RESET}")
+        return False, raw
     if not (raw.startswith("{") and raw.endswith("}")) and not (
         raw.startswith("[") and raw.endswith("]")
     ):
@@ -323,11 +327,11 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
                     )
                     print(f"{left}{' ' * 3}{BOLD}Type:{RESET} {type_name}")
                     if step_type == "SentinelPlanStep":
-                        if step.get("condition"):
+                        if "condition" in step:
                             print(
                                 f"{left}{' ' * 5}{BOLD}Condition:{RESET} {step['condition']}"
                             )
-                        if step.get("sleep_duration"):
+                        if "sleep_duration" in step:
                             print(
                                 f"{left}{' ' * 5}{BOLD}Sleep Duration:{RESET} {step['sleep_duration']}s"
                             )

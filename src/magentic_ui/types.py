@@ -95,22 +95,6 @@ class Plan(BaseModel):
                 plan_str += f"   [Sentinel: every {step.sleep_duration}s, condition: {condition_str}]\n"
         return plan_str
 
-    def model_dump(self, **kwargs) -> Dict[str, Any]:
-        """Override model_dump to include step_type in serialized output."""
-        result = super().model_dump(**kwargs)
-        steps_data = []
-
-        for step in self.steps:
-            step_data = step.model_dump()
-            if isinstance(step, SentinelPlanStep):
-                step_data["step_type"] = "SentinelPlanStep"
-            else:
-                step_data["step_type"] = "PlanStep"
-            steps_data.append(step_data)
-
-        result["steps"] = steps_data
-        return result
-
     @classmethod
     def from_list_of_dicts_or_str(
         cls, plan_dict: Union[List[Dict[str, str]], str, List[Any], Dict[str, Any]]
@@ -132,11 +116,9 @@ class Plan(BaseModel):
             if isinstance(raw_step, dict):
                 step: dict[str, Any] = raw_step  # type: ignore
 
-                # Check if this is a sentinel step based on step_type field
-                if (
-                    step.get("step_type", "") == "SentinelPlanStep"
-                    and "sleep_duration" in step
-                ):
+                # Check if this is a sentinel step based on whether it has
+                # the condition and sleep_duration fields
+                if "condition" in step and "sleep_duration" in step:
                     steps.append(
                         SentinelPlanStep(
                             title=step.get("title", "Untitled Step"),

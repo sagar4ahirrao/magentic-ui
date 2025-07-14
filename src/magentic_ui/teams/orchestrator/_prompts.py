@@ -130,6 +130,7 @@ def get_orchestrator_system_message_planning(
 
             For **SentinelPlanStep** ONLY, you should also include step_type, sleep_duration and condition fields:
             - **step_type** (string): Should be "SentinelPlanStep".
+            
             - **sleep_duration** (integer): Number of seconds to wait between checks. Intelligently extract timing from the user's request:
               * Explicit timing: "every 5 seconds" → 5, "check hourly" → 3600, "daily monitoring" → 86400
               * Contextual defaults based on task type:
@@ -140,9 +141,16 @@ def get_orchestrator_system_message_planning(
                 - General "constantly": 60-300 seconds
                 - General "periodically": 300-1800 seconds (5-30 minutes)
               * If no timing specified, choose based on context and avoid being too aggressive to prevent rate limiting
+            
             - **condition** (integer or string): Either:
               * Integer: Specific number of times to execute (e.g., "check 5 times" → 5)
               * String: Natural language description of the completion condition (e.g., "until star count reaches 2000")
+              * For String conditions, this should be a verifiable statement that can be programmatically checked against the output of an agent's action. The condition will be evaluated by another LLM based on the agent's response.
+                - GOOD: "condition:" "The response contains the text 'Download complete.'"
+                - GOOD: "condition:" "The webpage title is 'Stock Price Update'."
+                - BAD: "condition:" "Wait until the user says to stop." (The system cannot check this)
+                - BAD: "condition:" "Monitor for 5 minutes." (The system handles time, but the condition should be about the *result* of an action)
+
               * If not specified, use a descriptive condition from the task
 
             For **PlanStep** you should NOT include step_type, sleep_duration or condition fields, only title, details, and agent_name.
@@ -196,7 +204,7 @@ def get_orchestrator_system_message_planning(
             - agent_name: "web_surfer"
             - step_type: "SentinelPlanStep"
             - sleep_duration: 600
-            - condition: "until_condition_met"
+            - condition: "Has the follower count reached 2000 followers?"
 
             Step 2:
             - title: "Send partnership message to Nike"
@@ -215,7 +223,6 @@ def get_orchestrator_system_message_planning(
             - sleep_duration: 0
             - condition: 5
             
-
             Step 2:
             - title: "Say hi to the user using code"
             - details: "Say hi to the user using the coder agent. \\n Execute code to generate a greeting message."
@@ -227,17 +234,25 @@ def get_orchestrator_system_message_planning(
 
             Example 5:
 
-            User request: "Check Bing 5 times with a 30 second wait between each check for updates about SpaceX"
+            User request: "Check Bing 5 times with a 30 second wait between each check for updates about SpaceX then continuously monitor for their next rocket is launched."
             
             Step 1:
-            - title: "Monitor Bing for SpaceX updates with 5 repeated checks"
+            - title: "Monitor Bing for SpaceX updates with 5 repeated checks."
             - details: "Monitor Bing for SpaceX updates with 5 repeated checks. \\n Search Bing for SpaceX news and updates 5 times with 30 seconds between each search, collecting all new information found during the monitoring period."
             - agent_name: "web_surfer"
             - step_type: "SentinelPlanStep"
             - sleep_duration: 30
             - condition: 5
-            
-            IMPORTANT: Notice in Example 5, a single SentinelPlanStep is used to perform an action 5 times. DO NOT create multiple separate SentinelPlanSteps for repeated iterations - use a single step with the appropriate condition value. The condition parameter controls how many times the action repeats.
+
+            Step 2:
+            - title: "Continuously monitor for SpaceX rocket launches"
+            - details: "Continuously monitor for SpaceX rocket launches. \\n Check for any new SpaceX rocket launch announcements or updates, sleep 600s in between checks, and report when a new launch is detected."
+            - agent_name: "web_surfer"
+            - step_type: "SentinelPlanStep"
+            - sleep_duration: 600
+            - condition: "Has a new SpaceX rocket launch been announced?"
+
+            IMPORTANT: Notice in Example 5 - Step 1, a single SentinelPlanStep is used to perform an action 5 times. DO NOT create multiple separate SentinelPlanSteps for repeated iterations - use a single step with the appropriate condition value. The condition parameter controls how many times the action repeats.
 
 
             Example 6:
@@ -259,6 +274,7 @@ def get_orchestrator_system_message_planning(
             - As a reminder, PlanStep steps are for immediate actions that can be completed quickly, while SentinelPlanStep steps are for long-running tasks that require monitoring or periodic checks.
             - PlanStep takes 3 fields: title, details, and agent_name.
             - SentinelPlanStep takes 6 fields: title, details, agent_name, step_type, sleep_duration, and condition.
+            - If the condition field for a SentinelPlanStep is a string, it should be verifiable by the system based on the agent's response. It should describe a specific outcome that can be checked programmatically.
         """
 
     else:
@@ -401,7 +417,7 @@ def get_orchestrator_system_message_planning_autonomous(
             - Tasks that can be completed in a single execution cycle"""
 
         step_fields_section = """
-            Each step should have a title, details, step_type, and agent_name field.
+            Each step should have a title, details, and agent_name field.
 
             For **SentinelPlanStep** only, you should also include:
             - **sleep_duration** (integer): Number of seconds to wait between checks. Intelligently extract timing from the user's request:
@@ -435,19 +451,16 @@ def get_orchestrator_system_message_planning_autonomous(
             Step 1:
             - title: "Locate the menu of the first restaurant"
             - details: "Locate the menu of the first restaurant. \\n Search for top-rated restaurants in the 98052 area, select one with good reviews and an accessible menu, then extract and format the menu information."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Step 2:
             - title: "Locate the menu of the second restaurant"
             - details: "Locate the menu of the second restaurant. \\n After excluding the first restaurant, search for another well-reviewed establishment in 98052, ensuring it has a different cuisine type for variety, then collect and format its menu information."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Step 3:
             - title: "Locate the menu of the third restaurant"
             - details: "Locate the menu of the third restaurant. \\n Building on the previous searches but excluding the first two restaurants, find a third establishment with a distinct cuisine type, verify its menu is available online, and compile the menu details."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
 
@@ -458,13 +471,11 @@ def get_orchestrator_system_message_planning_autonomous(
             Step 1:
             - title: "Locate the starter code for the autogen repo"
             - details: "Locate the starter code for the autogen repo. \\n Search for the official AutoGen repository on GitHub, navigate to their examples or getting started section, and identify the recommended starter code for new users."
-            - step_type: "PlanStep"
             - agent_name: "web_surfer"
 
             Step 2:
             - title: "Execute the starter code for the autogen repo"
             - details: "Execute the starter code for the autogen repo. \\n Set up the Python environment with the correct dependencies, ensure all required packages are installed at their specified versions, and run the starter code while capturing any output or errors."
-            - step_type: "PlanStep"
             - agent_name: "coder_agent"
 
 
@@ -692,7 +703,7 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
             {{
                 "title": "title of step 1",
                 "details": "recap the title in one short sentence \\n remaining details of step 1",
-                "agent_name": "the name of the agent that should complete the step"
+                "agent_name": "the name of the agent that should complete the step",
                 "step_type": "SentinelPlanStep",
                 "condition": "number of times to repeat this step or a description of the completion condition",
                 "sleep_duration": "amount of time represented in seconds to sleep between each iteration of the step",
@@ -700,8 +711,8 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
             {{
                 "title": "title of step 2",
                 "details": "recap the title in one short sentence \\n remaining details of step 2",
-                "agent_name": "the name of the agent that should complete the step"                
-                "step_type": "PlanStep or SentinelPlanStep based on the classification above",
+                "agent_name": "the name of the agent that should complete the step",
+                "step_type": "SentinelPlanStep",
                 "condition": "number of times to repeat this step or a description of the completion condition",
                 "sleep_duration": "amount of time represented in seconds to sleep between each iteration of the step",
             }},
