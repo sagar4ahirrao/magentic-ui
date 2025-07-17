@@ -18,7 +18,11 @@ ORCHESTRATOR_FINAL_ANSWER_PROMPT = """
 
     Based on the information gathered, provide a final response to the user in response to the task.
 
-    Make sure the user can easily verify your answer, include links if there are any. Make sure to include any links.
+    Make sure the user can easily verify your answer, include links if there are any. 
+    
+    Please refer to steps of the plan that was used to complete the task. Use the steps as a way to help the user verify your answer.
+    
+    Make sure to also say whether the answer was found using online search or from your own knowledge.
 
     There is no need to be verbose, but make sure it contains enough information for the user.
 """
@@ -72,7 +76,7 @@ def get_orchestrator_system_message_planning(
 
     - is the user request missing information and can benefit from clarification? For instance, if the user asks "book a flight", the request is missing information about the destination, date and we should ask for clarification before proceeding. Do not ask to clarify more than once, after the first clarification, give a plan.
     - is the user request something that can be answered from the context of the conversation history without executing code, or browsing the internet or executing other tools? If so, we should answer the question directly in as much detail as possible.
-
+    When you answer without a plan and your answer includes factual information, make sure to say whether the answer was found using online search or from your own internal knowledge.
 
     Case 1: If the above is true, then we should provide our answer in the "response" field and set "needs_plan" to False.
     Case 1: If the above is true, then we should provide our answer in the "response" field and set "needs_plan" to False.
@@ -762,6 +766,8 @@ def get_orchestrator_plan_prompt_json(sentinel_tasks_enabled: bool = False) -> s
         {additional_instructions}
         {additional_instructions}
 
+        When you answer without a plan and your answer includes factual information, make sure to say whether the answer was found using online search or from your own internal knowledge.
+
         Your plan should should be a sequence of steps that will complete the task."""
 
     if sentinel_tasks_enabled:
@@ -1143,23 +1149,15 @@ def get_orchestrator_progress_ledger_prompt(
 
     {{{{
         "is_current_step_complete": {{{{
-    {{{{
-        "is_current_step_complete": {{{{
             "reason": string,
             "answer": boolean
         }}}},
         "need_to_replan": {{{{
-        }}}},
-        "need_to_replan": {{{{
             "reason": string,
             "answer": boolean
-        }}}},
-        "instruction_or_question": {{{{
         }}}},
         "instruction_or_question": {{{{
             "answer": string,
-            "agent_name": string (the name of the agent that should complete the step from {{names}})
-        }}}},
             "agent_name": string (the name of the agent that should complete the step from {{names}})
         }}}},
         "progress_summary": "a summary of the progress made so far"
@@ -1167,13 +1165,9 @@ def get_orchestrator_progress_ledger_prompt(
     }}}}"""
 
     return base_prompt + step_type_section + questions_section
-    }}}}"""
-
-    return base_prompt + step_type_section + questions_section
 
 
 def validate_ledger_json(json_response: Dict[str, Any], agent_names: List[str]) -> bool:
-    """Validate ledger JSON response - same for both modes."""
     """Validate ledger JSON response - same for both modes."""
     required_keys = [
         "is_current_step_complete",
@@ -1221,10 +1215,6 @@ def validate_plan_json(
     json_response: Dict[str, Any], sentinel_tasks_enabled: bool = False
 ) -> bool:
     """Validate plan JSON response, with different requirements based on sentinel tasks mode."""
-def validate_plan_json(
-    json_response: Dict[str, Any], sentinel_tasks_enabled: bool = False
-) -> bool:
-    """Validate plan JSON response, with different requirements based on sentinel tasks mode."""
     if not isinstance(json_response, dict):
         return False
     required_keys = ["task", "steps", "needs_plan", "response", "plan_summary"]
@@ -1235,30 +1225,6 @@ def validate_plan_json(
     for item in plan:
         if not isinstance(item, dict):
             return False
-
-        # SentinelPlanStep requires sleep_duration and condition
-        if sentinel_tasks_enabled:
-            # this means it is a PlanStep since it doesn't have the step_type field
-            if "step_type" not in item:
-                if (
-                    "title" not in item
-                    or "details" not in item
-                    or "agent_name" not in item
-                ):
-                    return False
-            elif item["step_type"] == "SentinelPlanStep":
-                # SentinelPlanStep requires sleep_duration and condition
-                if (
-                    "title" not in item
-                    or "details" not in item
-                    or "agent_name" not in item
-                    or "sleep_duration" not in item
-                    or "condition" not in item
-                ):
-                    return False
-        # If we are not in sentinel tasks mode
-        else:
-            # PlanStep does not require sleep_duration or condition
-            if "title" not in item or "details" not in item or "agent_name" not in item:
-                return False
+        if "title" not in item or "details" not in item or "agent_name" not in item:
+            return False
     return True
