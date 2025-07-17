@@ -52,6 +52,11 @@ from ._prompts import (
     get_orchestrator_plan_prompt_json,
     get_orchestrator_plan_replan_json,
     get_orchestrator_progress_ledger_prompt,
+    get_orchestrator_system_message_planning,
+    get_orchestrator_system_message_planning_autonomous,
+    get_orchestrator_plan_prompt_json,
+    get_orchestrator_plan_replan_json,
+    get_orchestrator_progress_ledger_prompt,
     ORCHESTRATOR_SYSTEM_MESSAGE_EXECUTION,
     ORCHESTRATOR_FINAL_ANSWER_PROMPT,
     ORCHESTRATOR_TASK_LEDGER_FULL_FORMAT,
@@ -181,6 +186,7 @@ class Orchestrator(BaseGroupChatManager):
             self._config.memory_controller_key
             and self._model_client
             and self._memory_provider is not None
+            and self._config.retrieve_relevant_plans in ["hint", "reuse"]
         ):
             try:
                 provider = self._memory_provider
@@ -242,10 +248,16 @@ class Orchestrator(BaseGroupChatManager):
             return get_orchestrator_system_message_planning_autonomous(
                 self._config.sentinel_tasks
             ).format(
+            return get_orchestrator_system_message_planning_autonomous(
+                self._config.sentinel_tasks
+            ).format(
                 date_today=date_today,
                 team=self._team_description,
             )
         else:
+            return get_orchestrator_system_message_planning(
+                self._config.sentinel_tasks
+            ).format(
             return get_orchestrator_system_message_planning(
                 self._config.sentinel_tasks
             ).format(
@@ -262,6 +274,7 @@ class Orchestrator(BaseGroupChatManager):
             )
 
         return get_orchestrator_plan_prompt_json(self._config.sentinel_tasks).format(
+        return get_orchestrator_plan_prompt_json(self._config.sentinel_tasks).format(
             team=team, additional_instructions=additional_instructions
         )
 
@@ -274,6 +287,7 @@ class Orchestrator(BaseGroupChatManager):
                 "Only use the following websites if possible: "
                 + ", ".join(self._config.allowed_websites)
             )
+        return get_orchestrator_plan_replan_json(self._config.sentinel_tasks).format(
         return get_orchestrator_plan_replan_json(self._config.sentinel_tasks).format(
             task=task,
             team=team,
@@ -337,6 +351,7 @@ class Orchestrator(BaseGroupChatManager):
         return validate_ledger_json(json_response, self._agent_execution_names)
 
     def _validate_plan_json(self, json_response: Dict[str, Any]) -> bool:
+        return validate_plan_json(json_response, self._config.sentinel_tasks)
         return validate_plan_json(json_response, self._config.sentinel_tasks)
 
     async def validate_group_state(
