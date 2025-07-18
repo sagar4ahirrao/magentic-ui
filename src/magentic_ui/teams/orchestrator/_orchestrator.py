@@ -74,6 +74,7 @@ WHITE_BG = "\033[47m"
 BLACK_TEXT = "\033[30m"
 UNDERLINE = "\033[4m"
 
+
 class OrchestratorState(BaseGroupChatManagerState):
     """
     The OrchestratorState class is responsible for maintaining the state of the group chat conversation.
@@ -1008,7 +1009,6 @@ class Orchestrator(BaseGroupChatManager):
     async def _orchestrate_step_execution(
         self, cancellation_token: CancellationToken
     ) -> None:
-
         # Execution stage
         # Check if we reached the maximum number of rounds
         assert self._state.plan is not None
@@ -1022,8 +1022,6 @@ class Orchestrator(BaseGroupChatManager):
 
         self._state.n_rounds += 1
 
-
-        
         # Gets the current step being executed
         current_step = self._state.plan[self._state.current_step_idx]
         print(f"{BLUE}Current Step: {current_step}{RESET}")
@@ -1032,7 +1030,6 @@ class Orchestrator(BaseGroupChatManager):
         # │  IF SENTINEL TASKS FLAG ARE ACTIVE AND STEP IS A SENTINEL STEP             │
         # ╰────────────────────────────────────────────────────────────────────────────╯
         if self._config.sentinel_tasks and isinstance(current_step, SentinelPlanStep):
-            
             # Logs the start of the sentinel step
             await self._log_message_agentchat(
                 f"Executing sentinel step: {current_step.title}",
@@ -1045,11 +1042,11 @@ class Orchestrator(BaseGroupChatManager):
                 await self._execute_sentinel_step(current_step, cancellation_token)
 
                 # If we reach here, the step has completed successfully
-                self._state.current_step_idx += 1 # moves to the next step
+                self._state.current_step_idx += 1  # moves to the next step
 
                 print(f"self._state.current_step_idx: {self._state.current_step_idx}")
                 print(f"len(self._state.plan): {len(self._state.plan)}")
-                
+
                 # Check for plan completion
                 if self._state.current_step_idx >= len(self._state.plan):
                     print("Plan completed successfully.")
@@ -1071,21 +1068,27 @@ class Orchestrator(BaseGroupChatManager):
                     self._team_description,
                     self._agent_execution_names,
                 )
-                
+
                 print("progress_ledger_prompt:", progress_ledger_prompt)
 
-                context.append(UserMessage(content=progress_ledger_prompt, source=self._name))
+                context.append(
+                    UserMessage(content=progress_ledger_prompt, source=self._name)
+                )
 
                 progress_ledger = await self._get_json_response(
                     context, self._validate_ledger_json, cancellation_token
                 )
                 print("\nProgress Ledger:", progress_ledger)
                 if self._state.is_paused:
-                    await self._request_next_speaker(self._user_agent_topic, cancellation_token)
+                    await self._request_next_speaker(
+                        self._user_agent_topic, cancellation_token
+                    )
                     return
                 assert progress_ledger is not None
                 # log the progress ledger
-                await self._log_message_agentchat(dict_to_str(progress_ledger), internal=True)
+                await self._log_message_agentchat(
+                    dict_to_str(progress_ledger), internal=True
+                )
 
                 # Check for replans
                 need_to_replan = progress_ledger["need_to_replan"]["answer"]
@@ -1111,7 +1114,7 @@ class Orchestrator(BaseGroupChatManager):
                         cancellation_token,
                     )
                     return
-                
+
                 if progress_ledger["progress_summary"] != "":
                     self._state.information_collected += (
                         "\n" + progress_ledger["progress_summary"]
@@ -1123,7 +1126,7 @@ class Orchestrator(BaseGroupChatManager):
                         cancellation_token,
                     )
                     return
-              
+
                 # Broadcast the next step
                 new_instruction = self.get_agent_instruction(
                     progress_ledger["instruction_or_question"]["answer"],
@@ -1131,9 +1134,10 @@ class Orchestrator(BaseGroupChatManager):
                 )
                 print("New Instruction:", new_instruction)
 
-                
                 message_to_send = TextMessage(
-                    content=new_instruction, source=self._name, metadata={"internal": "yes"}
+                    content=new_instruction,
+                    source=self._name,
+                    metadata={"internal": "yes"},
                 )
                 print()
                 print("Message to Send:", message_to_send)
@@ -1146,7 +1150,9 @@ class Orchestrator(BaseGroupChatManager):
                     "title": self._state.plan[self._state.current_step_idx].title,
                     "index": self._state.current_step_idx,
                     "details": self._state.plan[self._state.current_step_idx].details,
-                    "agent_name": progress_ledger["instruction_or_question"]["agent_name"],
+                    "agent_name": progress_ledger["instruction_or_question"][
+                        "agent_name"
+                    ],
                     "instruction": progress_ledger["instruction_or_question"]["answer"],
                     "progress_summary": progress_ledger["progress_summary"],
                     "plan_length": len(self._state.plan),
@@ -1154,7 +1160,9 @@ class Orchestrator(BaseGroupChatManager):
 
                 # Add SentinelPlanStep specific fields if applicable
                 current_step = self._state.plan[self._state.current_step_idx]
-                if self._config.sentinel_tasks and isinstance(current_step, SentinelPlanStep):
+                if self._config.sentinel_tasks and isinstance(
+                    current_step, SentinelPlanStep
+                ):
                     json_step_execution["step_type"] = "SentinelPlanStep"
                     json_step_execution["condition"] = current_step.condition
                     json_step_execution["sleep_duration"] = current_step.sleep_duration
@@ -1173,10 +1181,14 @@ class Orchestrator(BaseGroupChatManager):
                 else:
                     # Request that the step be completed
                     valid_next_speaker: bool = False
-                    next_speaker = progress_ledger["instruction_or_question"]["agent_name"]
+                    next_speaker = progress_ledger["instruction_or_question"][
+                        "agent_name"
+                    ]
                     for participant_name in self._agent_execution_names:
                         if participant_name == next_speaker:
-                            await self._request_next_speaker(next_speaker, cancellation_token)
+                            await self._request_next_speaker(
+                                next_speaker, cancellation_token
+                            )
                             valid_next_speaker = True
                             break
                     if not valid_next_speaker:
@@ -1196,7 +1208,7 @@ class Orchestrator(BaseGroupChatManager):
                     cancellation_token,
                 )
                 return
-            
+
         # ╭────────────────────────────────────────────────────────────────────────────╮
         # │  IF THE STEP IS A REGULAR STEP                                             │
         # ╰────────────────────────────────────────────────────────────────────────────╯
@@ -1220,7 +1232,9 @@ class Orchestrator(BaseGroupChatManager):
             print("progress_ledger_prompt:", progress_ledger_prompt)
 
             # appends the progress ledger prompt to the context
-            context.append(UserMessage(content=progress_ledger_prompt, source=self._name))
+            context.append(
+                UserMessage(content=progress_ledger_prompt, source=self._name)
+            )
 
             # validates the progress ledger JSON response
             print()
@@ -1228,22 +1242,25 @@ class Orchestrator(BaseGroupChatManager):
             progress_ledger = await self._get_json_response(
                 context, self._validate_ledger_json, cancellation_token
             )
-            
+
             print("\nProgress Ledger:", progress_ledger)
 
             if self._state.is_paused:
                 # let user speak next if paused
-                await self._request_next_speaker(self._user_agent_topic, cancellation_token)
+                await self._request_next_speaker(
+                    self._user_agent_topic, cancellation_token
+                )
                 return
             assert progress_ledger is not None
 
-            # log the progress ledger 
-            await self._log_message_agentchat(dict_to_str(progress_ledger), internal=True)
+            # log the progress ledger
+            await self._log_message_agentchat(
+                dict_to_str(progress_ledger), internal=True
+            )
 
             # Check for replans
             need_to_replan = progress_ledger["need_to_replan"]["answer"]
             replan_reason = progress_ledger["need_to_replan"]["reason"]
-
 
             if need_to_replan and self._config.allow_for_replans:
                 # Replan
@@ -1562,8 +1579,10 @@ class Orchestrator(BaseGroupChatManager):
             )
 
         # Creates a one-time instruction to the agent (UNUSED)
-        agent_instruction = await self._create_execution_task_from_condition(step.condition, agent_name)
-        print(f"{BOLD}{RED}agent_instruction: {agent_instruction}{RESET}")
+        # agent_instruction = await self._create_execution_task_from_condition(
+        #     step.condition, agent_name
+        # )
+        # print(f"{BOLD}{RED}agent_instruction: {agent_instruction}{RESET}")
 
         # TODO: need to make a snapshot of the agent and then reset its state at the end
 
@@ -1571,18 +1590,14 @@ class Orchestrator(BaseGroupChatManager):
         while True:
             try:
                 # Check if task is cancelled
-                if (
-                    cancellation_token
-                    and hasattr(cancellation_token, "_cancelled")
-                    and cancellation_token._cancelled
-                ):
+                if cancellation_token.is_cancelled():
                     return
 
                 iteration += 1
                 # Log the current monitoring iteration (unused)
                 monitoring_info = {
                     "title": step.title,
-                    "details": step.details,        
+                    "details": step.details,
                     "agent_name": step.agent_name,
                     "sleep_duration": step.sleep_duration,
                     "condition": str(step.condition),
@@ -1590,7 +1605,6 @@ class Orchestrator(BaseGroupChatManager):
                     "iteration": iteration,
                 }
                 print("monitoring info:", monitoring_info)
-
 
                 # Web Surfer Agent Check
                 # TODO Define these outside of the loop so we are not instantiating them every loop
@@ -1605,20 +1619,32 @@ class Orchestrator(BaseGroupChatManager):
                             )
                         )
                     )
-                    
-                    if web_surfer_container and web_surfer_container._agent:
-                        web_surfer = web_surfer_container._agent
-                        _, page_url = await web_surfer.get_page_title_url()
-                        # Web Surfer sends a message with the current page URL
+                    print("container  ", web_surfer_container)
+                    if web_surfer_container:
+                        # if web_surfer_container and web_surfer_container._agent:
+                        # web_surfer = web_surfer_container._agent
+
+                        # error because of the lazy init there is no browser to get page title url
+                        # _, page_url = await web_surfer.get_page_title_url()
+                        # print(f"Web Surfer page URL: {page_url}")
+                        # # Web Surfer sends a message with the current page URL
+                        # self._state.message_history.append(
+                        #     TextMessage(
+                        #         content=f"Currently on {page_url}",
+                        #         source=agent_name,
+                        #     )
+                        # )
+                        # placeholder since other way broke with lazy init PR
                         self._state.message_history.append(
                             TextMessage(
-                                content=f"Currently on {page_url}",
+                                content="Currently on Bing.com",
                                 source=agent_name,
                             )
                         )
+
                 # No Action Agent Check
                 elif agent_name == "no_action_agent":
-                    print('no_action_agent called')
+                    print("no_action_agent called")
                 # TODO: add other agents later (coder, file_surfer, mcp agents, etc)
 
                 # Get the agent's response (last message in history)
@@ -1634,8 +1660,11 @@ class Orchestrator(BaseGroupChatManager):
                         last_message.content, str
                     ):
                         response_content = last_message.content
-
-                    print(f"{BOLD}{BLUE}Last message content: {RESET}{str(last_message.content)}")
+                    else:
+                        response_content = "Unexpected message type or content"
+                    print(
+                        f"{BOLD}{BLUE}Last message content: {RESET}{str(response_content)}"
+                    )
 
                     # Check if condition is met
                     condition_met = False
@@ -1648,9 +1677,7 @@ class Orchestrator(BaseGroupChatManager):
 
                         # initializes empty context and adds the last message in the system
                         context: List[LLMMessage] = []
-                        context.append(
-                            SystemMessage(content=response_content)
-                        )
+                        context.append(SystemMessage(content=response_content))
 
                         # checks if the previous message suffices the condition
                         context.append(
@@ -1696,27 +1723,31 @@ class Orchestrator(BaseGroupChatManager):
                 # Handle cancellation
                 return
             except Exception as e:
+                # Log the exception before re-raising
+                print(f"Error in sentinel step execution: {e}")
                 raise
 
-    # Currently unused but it create a one-time execution task for the agent
-    async def _create_execution_task_from_condition(self, condition: str, agent_name: str) -> str:
-        """Transform a sentinel condition into an actionable execution task."""
-        context = [
-            SystemMessage(
-                content="You transform a monitoring condition into a single, direct, actionable task for an agent. The task must be something the agent can perform once to check the status of the condition."
-            ),
-            UserMessage(
-                content=(
-                    f"Here is a monitoring condition: '{condition}'.\n\n"
-                    f"Convert this into a single, direct, and actionable task for a '{agent_name}' agent. "
-                    "The task should instruct the agent to perform a single check and then report the outcome. "
-                    "For example, if the condition is 'Wait until the file is created', the task could be 'Check if the file exists and report the result.' "
-                    "Do not use words like 'monitor', 'wait', or 'continuously'."
-                    "Additionally, instruct that if a task has been met, the agent should return the word COMPLETE"
-                ),
-                source=self._name,
-            ),
-        ]
+    # # Currently unused but it create a one-time execution task for the agent
+    # async def _create_execution_task_from_condition(
+    #     self, condition: str, agent_name: str
+    # ) -> str:
+    #     """Transform a sentinel condition into an actionable execution task."""
+    #     context = [
+    #         SystemMessage(
+    #             content="You transform a monitoring condition into a single, direct, actionable task for an agent. The task must be something the agent can perform once to check the status of the condition."
+    #         ),
+    #         UserMessage(
+    #             content=(
+    #                 f"Here is a monitoring condition: '{condition}'.\n\n"
+    #                 f"Convert this into a single, direct, and actionable task for a '{agent_name}' agent. "
+    #                 "The task should instruct the agent to perform a single check and then report the outcome. "
+    #                 "For example, if the condition is 'Wait until the file is created', the task could be 'Check if the file exists and report the result.' "
+    #                 "Do not use words like 'monitor', 'wait', or 'continuously'."
+    #                 "Additionally, instruct that if a task has been met, the agent should return the word COMPLETE"
+    #             ),
+    #             source=self._name,
+    #         ),
+    #     ]
 
-        response = await self._model_client.create(context)
-        return response.content
+    #     response = await self._model_client.create(context)
+    #     return response.content

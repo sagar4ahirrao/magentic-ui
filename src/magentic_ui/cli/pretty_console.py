@@ -114,9 +114,9 @@ def header_box(agent: str) -> str:
 
 def transition_line(prev: str, curr: str) -> str:
     return (
-        f"{BOLD}{agent_color(prev)}{prev.upper()}{RESET}  "
+        f"{BOLD}{agent_color(prev)}{str(prev).upper()}{RESET}  "
         f"{BOLD}{YELLOW}━━━━▶{RESET}  "
-        f"{BOLD}{agent_color(curr)}{curr.upper()}{RESET}"
+        f"{BOLD}{agent_color(curr)}{str(curr).upper()}{RESET}"
     )
 
 
@@ -199,7 +199,7 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
             # Print reason if available
             if "reason" in step_complete:
                 print(f"{left}{' ' * 3}{BOLD}Reason:{RESET}")
-                _wrap(step_complete["reason"], 5)
+                _wrap(str(step_complete.get("reason", "")), 5)  # type: ignore[arg-type]
         else:
             # Simple boolean display if not in detailed format
             status = f"{GREEN}Yes{RESET}" if step_complete else f"{YELLOW}No{RESET}"
@@ -216,7 +216,7 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
             # Print reason if available
             if "reason" in replan:
                 print(f"{left}{' ' * 3}{BOLD}Reason:{RESET}")
-                _wrap(replan["reason"], 5)
+                _wrap(str(replan.get("reason", "")), 5)  # type: ignore[arg-type]
         else:
             # Simple boolean display if not in detailed format
             status = f"{YELLOW}Yes{RESET}" if replan else f"{GREEN}No{RESET}"
@@ -229,11 +229,11 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
         if isinstance(instruction, dict):
             if "answer" in instruction:
                 print(f"{left}{BOLD}Next Action:{RESET}")
-                _wrap(instruction["answer"], 3)
+                _wrap(str(instruction.get("answer", "")), 3)  # type: ignore[arg-type]
 
             # Show which agent will handle this instruction
             if "agent_name" in instruction:
-                agent = instruction["agent_name"].upper()
+                agent = str(instruction.get("agent_name", "")).upper()  # type: ignore[arg-type]
                 print(f"{left}{' ' * 3}{BOLD}Agent:{RESET} {agent}")
         else:
             # Simple string display if not in detailed format
@@ -244,7 +244,7 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
 
         # Progress summary
         print(f"{left}{BOLD}Progress Summary:{RESET}")
-        _wrap(obj["progress_summary"], 3)
+        _wrap(str(obj["progress_summary"]), 3)
         print(left)  # Add spacing between sections
 
         print(f"{left}{BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
@@ -253,19 +253,19 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
     if obj.get("response"):
         print(left)
         print(f"{left}{BOLD}Response:{RESET}")
-        _wrap(obj["response"])
+        _wrap(str(obj["response"]))
 
     # Task
     if obj.get("task"):
         print(left)
         print(f"{left}{BOLD}Task:{RESET}")
-        _wrap(obj["task"])
+        _wrap(str(obj["task"]))
 
     # Summary
     if obj.get("plan_summary"):
         print(left)
         print(f"{left}{BOLD}Plan Summary:{RESET}")
-        _wrap(obj["plan_summary"])
+        _wrap(str(obj["plan_summary"]))
 
     # Needs Replan
     if obj.get("needs_plan"):
@@ -302,17 +302,17 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
                 # shows the details for a specific step
                 if step.get("details"):
                     print(f"{left}{' ' * 3}{BOLD}Details:{RESET}")
-                    _wrap(step["details"], 5)
+                    _wrap(str(step["details"]), 5)
 
                 # ---
                 if step.get("instruction"):
                     print(f"{left}{' ' * 3}{BOLD}Instruction:{RESET}")
-                    _wrap(step["instruction"], 7)
+                    _wrap(str(step["instruction"]), 7)
 
                 # ---
                 if step.get("progress_summary"):
                     print(f"{left}{' ' * 3}{BOLD}Progress Summary:{RESET}")
-                    _wrap(step["progress_summary"], 7)
+                    _wrap(str(step["progress_summary"]), 7)
 
                 # shows which agent should perform the action for this step
                 if step.get("agent_name"):
@@ -356,7 +356,7 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
         if "title" in obj:
             print(left)
             print(f"{left}{BOLD}Title:{RESET}")
-            _wrap(obj["title"])
+            _wrap(str(obj["title"]))
 
         if "index" in obj:
             print(left)
@@ -365,21 +365,21 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
         if "details" in obj:
             print(left)
             print(f"{left}{BOLD}Details:{RESET}")
-            _wrap(obj["details"])
+            _wrap(str(obj["details"]))
 
         if "agent_name" in obj:
             print(left)
-            print(f"{left}{BOLD}Agent:{RESET} {obj['agent_name'].upper()}")
+            print(f"{left}{BOLD}Agent:{RESET} {str(obj['agent_name']).upper()}")
 
         if "instruction" in obj:
             print(left)
             print(f"{left}{BOLD}Instruction:{RESET}")
-            _wrap(obj["instruction"])
+            _wrap(str(obj["instruction"]))
 
         if "progress_summary" in obj:
             print(left)
             print(f"{left}{BOLD}Progress:{RESET}")
-            _wrap(obj["progress_summary"])
+            _wrap(str(obj["progress_summary"]))
 
         if "plan_length" in obj:
             print(left)
