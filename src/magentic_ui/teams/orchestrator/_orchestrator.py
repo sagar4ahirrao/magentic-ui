@@ -62,18 +62,6 @@ from ._prompts import (
 from ._utils import is_accepted_str, extract_json_from_string
 from loguru import logger as trace_logger
 
-BOLD = "\033[1m"
-RESET = "\033[0m"
-BLUE = "\033[34m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-CYAN = "\033[36m"
-MAGENTA = "\033[35m"
-RED = "\033[31m"
-WHITE_BG = "\033[47m"
-BLACK_TEXT = "\033[30m"
-UNDERLINE = "\033[4m"
-
 
 class OrchestratorState(BaseGroupChatManagerState):
     """
@@ -819,7 +807,6 @@ class Orchestrator(BaseGroupChatManager):
                 if user_plan is not None:
                     self._state.plan = user_plan
                     self._state.plan_str = str(user_plan)
-                    print("User accepted the plan:", self._state.plan_str)
                 # switch to execution mode
                 self._state.in_planning_mode = False
                 await self._orchestrate_step_execution(cancellation_token)
@@ -1016,7 +1003,6 @@ class Orchestrator(BaseGroupChatManager):
             self._config.max_turns is not None
             and self._state.n_rounds > self._config.max_turns
         ):
-            print(f"{GREEN}Preparing final answer...{RESET}")
             await self._prepare_final_answer("Max rounds reached.", cancellation_token)
             return
 
@@ -1024,7 +1010,6 @@ class Orchestrator(BaseGroupChatManager):
 
         # Gets the current step being executed
         current_step = self._state.plan[self._state.current_step_idx]
-        print(f"{BLUE}Current Step: {current_step}{RESET}")
 
         # ╭────────────────────────────────────────────────────────────────────────────╮
         # │  IF SENTINEL TASKS FLAG ARE ACTIVE AND STEP IS A SENTINEL STEP             │
@@ -1044,12 +1029,8 @@ class Orchestrator(BaseGroupChatManager):
                 # If we reach here, the step has completed successfully
                 self._state.current_step_idx += 1  # moves to the next step
 
-                print(f"self._state.current_step_idx: {self._state.current_step_idx}")
-                print(f"len(self._state.plan): {len(self._state.plan)}")
-
                 # Check for plan completion
                 if self._state.current_step_idx >= len(self._state.plan):
-                    print("Plan completed successfully.")
                     await self._prepare_final_answer(
                         "Plan completed.",
                         cancellation_token,
@@ -1057,8 +1038,6 @@ class Orchestrator(BaseGroupChatManager):
                     return
 
                 context = self._thread_to_context()
-                print()
-                print("context:", context)
 
                 # Update the progress ledger
                 progress_ledger_prompt = self._get_progress_ledger_prompt(
@@ -1069,8 +1048,6 @@ class Orchestrator(BaseGroupChatManager):
                     self._agent_execution_names,
                 )
 
-                print("progress_ledger_prompt:", progress_ledger_prompt)
-
                 context.append(
                     UserMessage(content=progress_ledger_prompt, source=self._name)
                 )
@@ -1078,7 +1055,6 @@ class Orchestrator(BaseGroupChatManager):
                 progress_ledger = await self._get_json_response(
                     context, self._validate_ledger_json, cancellation_token
                 )
-                print("\nProgress Ledger:", progress_ledger)
                 if self._state.is_paused:
                     await self._request_next_speaker(
                         self._user_agent_topic, cancellation_token
@@ -1132,15 +1108,12 @@ class Orchestrator(BaseGroupChatManager):
                     progress_ledger["instruction_or_question"]["answer"],
                     progress_ledger["instruction_or_question"]["agent_name"],
                 )
-                print("New Instruction:", new_instruction)
 
                 message_to_send = TextMessage(
                     content=new_instruction,
                     source=self._name,
                     metadata={"internal": "yes"},
                 )
-                print()
-                print("Message to Send:", message_to_send)
                 self._state.message_history.append(message_to_send)  # My copy
 
                 await self._publish_group_chat_message(
@@ -1195,7 +1168,6 @@ class Orchestrator(BaseGroupChatManager):
                         raise ValueError(
                             f"Invalid next speaker: {next_speaker} from the ledger, participants are: {self._agent_execution_names}"
                         )
-                    print("Next speaker requested:", next_speaker)
 
             except Exception as e:
                 # Handle errors in sentinel execution
@@ -1217,8 +1189,6 @@ class Orchestrator(BaseGroupChatManager):
 
             # converts chat history into a list of LLMMessage objects
             context = self._thread_to_context()
-            print()
-            print("context:", context)
 
             # Update the progress ledger
             progress_ledger_prompt = self._get_progress_ledger_prompt(
@@ -1228,8 +1198,6 @@ class Orchestrator(BaseGroupChatManager):
                 self._team_description,
                 self._agent_execution_names,
             )
-            print()
-            print("progress_ledger_prompt:", progress_ledger_prompt)
 
             # appends the progress ledger prompt to the context
             context.append(
@@ -1237,13 +1205,9 @@ class Orchestrator(BaseGroupChatManager):
             )
 
             # validates the progress ledger JSON response
-            print()
-            print("Validating progress ledger JSON response...")
             progress_ledger = await self._get_json_response(
                 context, self._validate_ledger_json, cancellation_token
             )
-
-            print("\nProgress Ledger:", progress_ledger)
 
             if self._state.is_paused:
                 # let user speak next if paused
@@ -1594,18 +1558,6 @@ class Orchestrator(BaseGroupChatManager):
                     return
 
                 iteration += 1
-                # Log the current monitoring iteration (unused)
-                monitoring_info = {
-                    "title": step.title,
-                    "details": step.details,
-                    "agent_name": step.agent_name,
-                    "sleep_duration": step.sleep_duration,
-                    "condition": str(step.condition),
-                    "step_type": "SentinelPlanStep",
-                    "iteration": iteration,
-                }
-                print("monitoring info:", monitoring_info)
-
                 # Web Surfer Agent Check
                 # TODO Define these outside of the loop so we are not instantiating them every loop
                 if agent_name == "web_surfer":
@@ -1619,7 +1571,6 @@ class Orchestrator(BaseGroupChatManager):
                             )
                         )
                     )
-                    print("container  ", web_surfer_container)
                     if web_surfer_container:
                         # if web_surfer_container and web_surfer_container._agent:
                         # web_surfer = web_surfer_container._agent
@@ -1644,15 +1595,13 @@ class Orchestrator(BaseGroupChatManager):
 
                 # No Action Agent Check
                 elif agent_name == "no_action_agent":
-                    print("no_action_agent called")
+                    pass
                 # TODO: add other agents later (coder, file_surfer, mcp agents, etc)
 
                 # Get the agent's response (last message in history)
                 if len(self._state.message_history) > 0:
                     last_message = self._state.message_history[-1]
                     response_content = ""
-
-                    print(f"{BOLD}{BLUE}Last message : {RESET}{str(last_message)}")
 
                     if isinstance(last_message, TextMessage):  # only text
                         response_content = last_message.content
@@ -1662,9 +1611,6 @@ class Orchestrator(BaseGroupChatManager):
                         response_content = last_message.content
                     else:
                         response_content = "Unexpected message type or content"
-                    print(
-                        f"{BOLD}{BLUE}Last message content: {RESET}{str(response_content)}"
-                    )
 
                     # Check if condition is met
                     condition_met = False
@@ -1687,9 +1633,6 @@ class Orchestrator(BaseGroupChatManager):
                             )
                         )
 
-                        # this should always print out 2 messages
-                        print(f"\nContext Being Passed: {context}")
-
                         # sends the condition check (the 2 messages) to an LLM
                         response = await self._model_client.create(
                             context, cancellation_token=cancellation_token
@@ -1700,21 +1643,17 @@ class Orchestrator(BaseGroupChatManager):
                             and "no" not in response_text.lower()
                         )
 
-                        print(f"\nResponse Received: {response_text}")
-
                     # If condition met, return to complete the step
                     if condition_met:
-                        print()
-                        print("Condition met, completing sentinel step.")
                         await self._log_message_agentchat(
-                            f"{BOLD}{RED}[SENTINEL]{RESET} Condition met: {step.condition}, proceed to next step if there is any.",
+                            f"[SENTINEL] Condition met: {step.condition}, proceed to next step if there is any.",
                             metadata={"internal": "no", "type": "sentinel_complete"},
                         )
                         return
 
                 # Sleep before the next check
                 await self._log_message_agentchat(
-                    f"{BOLD}{RED}[SENTINEL]{RESET} Sleeping for {step.sleep_duration}s until next check",
+                    f"[SENTINEL] Sleeping for {step.sleep_duration}s until next check",
                     metadata={"internal": "no", "type": "sentinel_sleep"},
                 )
                 await asyncio.sleep(step.sleep_duration)
@@ -1724,30 +1663,5 @@ class Orchestrator(BaseGroupChatManager):
                 return
             except Exception as e:
                 # Log the exception before re-raising
-                print(f"Error in sentinel step execution: {e}")
+                trace_logger.error(f"Error in sentinel step execution: {e}")
                 raise
-
-    # # Currently unused but it create a one-time execution task for the agent
-    # async def _create_execution_task_from_condition(
-    #     self, condition: str, agent_name: str
-    # ) -> str:
-    #     """Transform a sentinel condition into an actionable execution task."""
-    #     context = [
-    #         SystemMessage(
-    #             content="You transform a monitoring condition into a single, direct, actionable task for an agent. The task must be something the agent can perform once to check the status of the condition."
-    #         ),
-    #         UserMessage(
-    #             content=(
-    #                 f"Here is a monitoring condition: '{condition}'.\n\n"
-    #                 f"Convert this into a single, direct, and actionable task for a '{agent_name}' agent. "
-    #                 "The task should instruct the agent to perform a single check and then report the outcome. "
-    #                 "For example, if the condition is 'Wait until the file is created', the task could be 'Check if the file exists and report the result.' "
-    #                 "Do not use words like 'monitor', 'wait', or 'continuously'."
-    #                 "Additionally, instruct that if a task has been met, the agent should return the word COMPLETE"
-    #             ),
-    #             source=self._name,
-    #         ),
-    #     ]
-
-    #     response = await self._model_client.create(context)
-    #     return response.content
