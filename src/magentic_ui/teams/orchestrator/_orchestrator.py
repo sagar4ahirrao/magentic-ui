@@ -897,40 +897,39 @@ class Orchestrator(BaseGroupChatManager):
             self._state.in_planning_mode = False
             await self._orchestrate_step_execution(cancellation_token)
 
-    async def _orchestrate_first_step(
-        self, cancellation_token: CancellationToken
+    async def _orchestrate_step_execution(
+        self, cancellation_token: CancellationToken, first_step: bool = False
     ) -> None:
-        # remove all messages from the message thread that are not from the user
-        self._state.message_history = [
-            m
-            for m in self._state.message_history
-            if m.source not in ["user", self._user_agent_topic]
-        ]
+        # Execution stage
+        if first_step:
+            # remove all messages from the message thread that are not from the user
+            self._state.message_history = [
+                m
+                for m in self._state.message_history
+                if m.source not in ["user", self._user_agent_topic]
+            ]
 
-        ledger_message = TextMessage(
-            content=self._get_task_ledger_full_prompt(
-                self._state.task, self._team_description, self._state.plan_str
-            ),
-            source=self._name,
-        )
-        # add the ledger message to the message thread internally
-        self._state.message_history.append(ledger_message)
-        await self._log_message_agentchat(ledger_message.content, internal=True)
-
-        # check if the plan is empty, complete, or we have reached the max turns
-        if (
-            (not isinstance(self._state.plan, Plan) or len(self._state.plan) == 0)
-            or (self._state.current_step_idx >= len(self._state.plan))
-            or (
-                self._config.max_turns is not None
-                and self._state.n_rounds > self._config.max_turns
+            ledger_message = TextMessage(
+                content=self._get_task_ledger_full_prompt(
+                    self._state.task, self._team_description, self._state.plan_str
+                ),
+                source=self._name,
             )
+            # add the ledger message to the message thread internally
+            self._state.message_history.append(ledger_message)
+            await self._log_message_agentchat(ledger_message.content, internal=True)
+
+        assert self._state.plan is not None
+        if self._state.current_step_idx >= len(self._state.plan) or (
+            self._config.max_turns is not None
+            and self._state.n_rounds > self._config.max_turns
         ):
             await self._prepare_final_answer("Max rounds reached.", cancellation_token)
             return
+
         self._state.n_rounds += 1
         context = self._thread_to_context()
-        # Creat the progress ledger
+        # Update the progress ledger
 
         progress_ledger_prompt = self._get_progress_ledger_prompt(
             self._state.task,
@@ -939,25 +938,63 @@ class Orchestrator(BaseGroupChatManager):
             self._team_description,
             self._agent_execution_names,
         )
+
         context.append(UserMessage(content=progress_ledger_prompt, source=self._name))
 
         progress_ledger = await self._get_json_response(
             context, self._validate_ledger_json, cancellation_token
         )
         if self._state.is_paused:
-            # let user speak next if paused
             await self._request_next_speaker(self._user_agent_topic, cancellation_token)
             return
         assert progress_ledger is not None
-
+        # log the progress ledger
         await self._log_message_agentchat(dict_to_str(progress_ledger), internal=True)
+
+        # Check for replans
+        need_to_replan = progress_ledger["need_to_replan"]["answer"]
+        replan_reason = progress_ledger["need_to_replan"]["reason"]
+
+        if need_to_replan and self._config.allow_for_replans:
+            # Replan
+            if self._config.max_replans is None:
+                await self._replan(replan_reason, cancellation_token)
+            elif self._state.n_replans < self._config.max_replans:
+                self._state.n_replans += 1
+                await self._replan(replan_reason, cancellation_token)
+                return
+            else:
+                await self._prepare_final_answer(
+                    f"We need to replan but max replan attempts reached: {replan_reason}.",
+                    cancellation_token,
+                )
+                return
+        elif need_to_replan:
+            await self._prepare_final_answer(
+                f"The current plan failed to complete the task, we need a new plan to continue. {replan_reason}",
+                cancellation_token,
+            )
+            return
+        if progress_ledger["is_current_step_complete"]["answer"]:
+            self._state.current_step_idx += 1
+
+        if progress_ledger["progress_summary"] != "":
+            self._state.information_collected += (
+                "\n" + progress_ledger["progress_summary"]
+            )
+        # Check for plan completion
+        if self._state.current_step_idx >= len(self._state.plan):
+            await self._prepare_final_answer(
+                "Plan completed.",
+                cancellation_token,
+            )
+            return
 
         # Broadcast the next step
         new_instruction = self.get_agent_instruction(
             progress_ledger["instruction_or_question"]["answer"],
             progress_ledger["instruction_or_question"]["agent_name"],
         )
-
         message_to_send = TextMessage(
             content=new_instruction, source=self._name, metadata={"internal": "yes"}
         )
@@ -975,11 +1012,11 @@ class Orchestrator(BaseGroupChatManager):
             "progress_summary": progress_ledger["progress_summary"],
             "plan_length": len(self._state.plan),
         }
-
         await self._log_message_agentchat(
             json.dumps(json_step_execution),
             metadata={"internal": "no", "type": "step_execution"},
         )
+
         # Request that the step be completed
         valid_next_speaker: bool = False
         next_speaker = progress_ledger["instruction_or_question"]["agent_name"]
@@ -992,315 +1029,6 @@ class Orchestrator(BaseGroupChatManager):
             raise ValueError(
                 f"Invalid next speaker: {next_speaker} from the ledger, participants are: {self._agent_execution_names}"
             )
-
-    async def _orchestrate_step_execution(
-        self, cancellation_token: CancellationToken
-    ) -> None:
-        # Execution stage
-        # Check if we reached the maximum number of rounds
-        assert self._state.plan is not None
-        if self._state.current_step_idx >= len(self._state.plan) or (
-            self._config.max_turns is not None
-            and self._state.n_rounds > self._config.max_turns
-        ):
-            await self._prepare_final_answer("Max rounds reached.", cancellation_token)
-            return
-
-        self._state.n_rounds += 1
-
-        # Gets the current step being executed
-        current_step = self._state.plan[self._state.current_step_idx]
-
-        # ╭────────────────────────────────────────────────────────────────────────────╮
-        # │  IF SENTINEL TASKS FLAG ARE ACTIVE AND STEP IS A SENTINEL STEP             │
-        # ╰────────────────────────────────────────────────────────────────────────────╯
-        if self._config.sentinel_tasks and isinstance(current_step, SentinelPlanStep):
-            # Logs the start of the sentinel step
-            await self._log_message_agentchat(
-                f"Executing sentinel step: {current_step.title}",
-                metadata={"internal": "no", "type": "sentinel_start"},
-            )
-
-            # Execute the sentinel step
-            try:
-                # All execution logic for the sentinel step is handled in this method
-                await self._execute_sentinel_step(current_step, cancellation_token)
-
-                # If we reach here, the step has completed successfully
-                self._state.current_step_idx += 1  # moves to the next step
-
-                # Check for plan completion
-                if self._state.current_step_idx >= len(self._state.plan):
-                    await self._prepare_final_answer(
-                        "Plan completed.",
-                        cancellation_token,
-                    )
-                    return
-
-                context = self._thread_to_context()
-
-                # Update the progress ledger
-                progress_ledger_prompt = self._get_progress_ledger_prompt(
-                    self._state.task,
-                    self._state.plan_str,
-                    self._state.current_step_idx,
-                    self._team_description,
-                    self._agent_execution_names,
-                )
-
-                context.append(
-                    UserMessage(content=progress_ledger_prompt, source=self._name)
-                )
-
-                progress_ledger = await self._get_json_response(
-                    context, self._validate_ledger_json, cancellation_token
-                )
-                if self._state.is_paused:
-                    await self._request_next_speaker(
-                        self._user_agent_topic, cancellation_token
-                    )
-                    return
-                assert progress_ledger is not None
-                # log the progress ledger
-                await self._log_message_agentchat(
-                    dict_to_str(progress_ledger), internal=True
-                )
-
-                # Check for replans
-                need_to_replan = progress_ledger["need_to_replan"]["answer"]
-                replan_reason = progress_ledger["need_to_replan"]["reason"]
-
-                if need_to_replan and self._config.allow_for_replans:
-                    # Replan
-                    if self._config.max_replans is None:
-                        await self._replan(replan_reason, cancellation_token)
-                    elif self._state.n_replans < self._config.max_replans:
-                        self._state.n_replans += 1
-                        await self._replan(replan_reason, cancellation_token)
-                        return
-                    else:
-                        await self._prepare_final_answer(
-                            f"We need to replan but max replan attempts reached: {replan_reason}.",
-                            cancellation_token,
-                        )
-                        return
-                elif need_to_replan:
-                    await self._prepare_final_answer(
-                        f"The current plan failed to complete the task, we need a new plan to continue. {replan_reason}",
-                        cancellation_token,
-                    )
-                    return
-
-                if progress_ledger["progress_summary"] != "":
-                    self._state.information_collected += (
-                        "\n" + progress_ledger["progress_summary"]
-                    )
-                # Check for plan completion
-                if self._state.current_step_idx >= len(self._state.plan):
-                    await self._prepare_final_answer(
-                        "Plan completed.",
-                        cancellation_token,
-                    )
-                    return
-
-                # Broadcast the next step
-                new_instruction = self.get_agent_instruction(
-                    progress_ledger["instruction_or_question"]["answer"],
-                    progress_ledger["instruction_or_question"]["agent_name"],
-                )
-
-                message_to_send = TextMessage(
-                    content=new_instruction,
-                    source=self._name,
-                    metadata={"internal": "yes"},
-                )
-                self._state.message_history.append(message_to_send)  # My copy
-
-                await self._publish_group_chat_message(
-                    message_to_send.content, cancellation_token, internal=True
-                )
-                json_step_execution = {
-                    "title": self._state.plan[self._state.current_step_idx].title,
-                    "index": self._state.current_step_idx,
-                    "details": self._state.plan[self._state.current_step_idx].details,
-                    "agent_name": progress_ledger["instruction_or_question"][
-                        "agent_name"
-                    ],
-                    "instruction": progress_ledger["instruction_or_question"]["answer"],
-                    "progress_summary": progress_ledger["progress_summary"],
-                    "plan_length": len(self._state.plan),
-                }
-
-                # Add SentinelPlanStep specific fields if applicable
-                current_step = self._state.plan[self._state.current_step_idx]
-                if self._config.sentinel_tasks and isinstance(
-                    current_step, SentinelPlanStep
-                ):
-                    json_step_execution["step_type"] = "SentinelPlanStep"
-                    json_step_execution["condition"] = current_step.condition
-                    json_step_execution["sleep_duration"] = current_step.sleep_duration
-
-                await self._log_message_agentchat(
-                    json.dumps(json_step_execution),
-                    metadata={"internal": "no", "type": "step_execution"},
-                )
-
-                if isinstance(current_step, SentinelPlanStep):
-                    # HACK: if next step is a sentinel step, pass no_action_agent
-                    # as the next speaker to avoid confusion
-                    next_speaker = "no_action_agent"
-                    await self._request_next_speaker(next_speaker, cancellation_token)
-                    valid_next_speaker = True
-                else:
-                    # Request that the step be completed
-                    valid_next_speaker: bool = False
-                    next_speaker = progress_ledger["instruction_or_question"][
-                        "agent_name"
-                    ]
-                    for participant_name in self._agent_execution_names:
-                        if participant_name == next_speaker:
-                            await self._request_next_speaker(
-                                next_speaker, cancellation_token
-                            )
-                            valid_next_speaker = True
-                            break
-                    if not valid_next_speaker:
-                        raise ValueError(
-                            f"Invalid next speaker: {next_speaker} from the ledger, participants are: {self._agent_execution_names}"
-                        )
-
-            except Exception as e:
-                # Handle errors in sentinel execution
-                await self._log_message_agentchat(
-                    f"Error executing sentinel step: {str(e)}",
-                    metadata={"internal": "no", "type": "sentinel_error"},
-                )
-                await self._prepare_final_answer(
-                    f"Error executing sentinel step: {str(e)}",
-                    cancellation_token,
-                )
-                return
-
-        # ╭────────────────────────────────────────────────────────────────────────────╮
-        # │  IF THE STEP IS A REGULAR STEP                                             │
-        # ╰────────────────────────────────────────────────────────────────────────────╯
-        else:
-            # Normal step execution logic for regular PlanSteps
-
-            # converts chat history into a list of LLMMessage objects
-            context = self._thread_to_context()
-
-            # Update the progress ledger
-            progress_ledger_prompt = self._get_progress_ledger_prompt(
-                self._state.task,
-                self._state.plan_str,
-                self._state.current_step_idx,
-                self._team_description,
-                self._agent_execution_names,
-            )
-
-            # appends the progress ledger prompt to the context
-            context.append(
-                UserMessage(content=progress_ledger_prompt, source=self._name)
-            )
-
-            # validates the progress ledger JSON response
-            progress_ledger = await self._get_json_response(
-                context, self._validate_ledger_json, cancellation_token
-            )
-
-            if self._state.is_paused:
-                # let user speak next if paused
-                await self._request_next_speaker(
-                    self._user_agent_topic, cancellation_token
-                )
-                return
-            assert progress_ledger is not None
-
-            # log the progress ledger
-            await self._log_message_agentchat(
-                dict_to_str(progress_ledger), internal=True
-            )
-
-            # Check for replans
-            need_to_replan = progress_ledger["need_to_replan"]["answer"]
-            replan_reason = progress_ledger["need_to_replan"]["reason"]
-
-            if need_to_replan and self._config.allow_for_replans:
-                # Replan
-                if self._config.max_replans is None:
-                    await self._replan(replan_reason, cancellation_token)
-                elif self._state.n_replans < self._config.max_replans:
-                    self._state.n_replans += 1
-                    await self._replan(replan_reason, cancellation_token)
-                    return
-                else:
-                    await self._prepare_final_answer(
-                        f"We need to replan but max replan attempts reached: {replan_reason}.",
-                        cancellation_token,
-                    )
-                    return
-            elif need_to_replan:
-                await self._prepare_final_answer(
-                    f"The current plan failed to complete the task, we need a new plan to continue. {replan_reason}",
-                    cancellation_token,
-                )
-                return
-            if progress_ledger["is_current_step_complete"]["answer"]:
-                self._state.current_step_idx += 1
-
-            if progress_ledger["progress_summary"] != "":
-                self._state.information_collected += (
-                    "\n" + progress_ledger["progress_summary"]
-                )
-            # Check for plan completion
-            if self._state.current_step_idx >= len(self._state.plan):
-                await self._prepare_final_answer(
-                    "Plan completed.",
-                    cancellation_token,
-                )
-                return
-
-            # Broadcast the next step
-            new_instruction = self.get_agent_instruction(
-                progress_ledger["instruction_or_question"]["answer"],
-                progress_ledger["instruction_or_question"]["agent_name"],
-            )
-            message_to_send = TextMessage(
-                content=new_instruction, source=self._name, metadata={"internal": "yes"}
-            )
-            self._state.message_history.append(message_to_send)  # My copy
-
-            await self._publish_group_chat_message(
-                message_to_send.content, cancellation_token, internal=True
-            )
-            json_step_execution = {
-                "title": self._state.plan[self._state.current_step_idx].title,
-                "index": self._state.current_step_idx,
-                "details": self._state.plan[self._state.current_step_idx].details,
-                "agent_name": progress_ledger["instruction_or_question"]["agent_name"],
-                "instruction": progress_ledger["instruction_or_question"]["answer"],
-                "progress_summary": progress_ledger["progress_summary"],
-                "plan_length": len(self._state.plan),
-            }
-
-            await self._log_message_agentchat(
-                json.dumps(json_step_execution),
-                metadata={"internal": "no", "type": "step_execution"},
-            )
-
-            # Request that the step be completed
-            valid_next_speaker: bool = False
-            next_speaker = progress_ledger["instruction_or_question"]["agent_name"]
-            for participant_name in self._agent_execution_names:
-                if participant_name == next_speaker:
-                    await self._request_next_speaker(next_speaker, cancellation_token)
-                    valid_next_speaker = True
-                    break
-            if not valid_next_speaker:
-                raise ValueError(
-                    f"Invalid next speaker: {next_speaker} from the ledger, participants are: {self._agent_execution_names}"
-                )
 
     async def _replan(self, reason: str, cancellation_token: CancellationToken) -> None:
         # Let's create a new plan
