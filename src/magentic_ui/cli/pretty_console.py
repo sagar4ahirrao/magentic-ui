@@ -261,17 +261,6 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
         print(f"{left}{BOLD}Task:{RESET}")
         _wrap(str(obj["task"]))
 
-    # Summary
-    if obj.get("plan_summary"):
-        print(left)
-        print(f"{left}{BOLD}Plan Summary:{RESET}")
-        _wrap(str(obj["plan_summary"]))
-
-    # Needs Replan
-    if obj.get("needs_plan"):
-        print(left)  # new line using the bar "┃" icon
-        print(f"{left}{BOLD}Needs Plan:{RESET} {str(obj['needs_plan'])}")
-
     # Steps
     steps: list[dict[str, Any]] = obj.get("steps", []) or []
     if steps:
@@ -355,7 +344,7 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
 
         if "title" in obj:
             print(left)
-            print(f"{left}{BOLD}Title:{RESET}")
+            print(f"{left}{BOLD} Step {idx}:{RESET}")
             _wrap(str(obj["title"]))
 
         if "index" in obj:
@@ -380,10 +369,6 @@ def format_plan(obj: dict[str, Any], colour: str) -> None:
             print(left)
             print(f"{left}{BOLD}Progress:{RESET}")
             _wrap(str(obj["progress_summary"]))
-
-        if "plan_length" in obj:
-            print(left)
-            print(f"{left}{BOLD}Plan Length:{RESET} {obj['plan_length']} steps")
 
         if "step_type" in obj:
             step_type = (
