@@ -737,7 +737,9 @@ class Orchestrator(BaseGroupChatManager):
 
                 if not self._config.cooperative_planning:
                     self._state.in_planning_mode = False
-                    await self._orchestrate_step_execution(cancellation_token)
+                    await self._orchestrate_step_execution(
+                        cancellation_token, first_step=True
+                    )
                     return
                 else:
                     await self._request_next_speaker(
@@ -753,7 +755,9 @@ class Orchestrator(BaseGroupChatManager):
                     last_user_message.content
                 ):
                     self._state.in_planning_mode = False
-                    await self._orchestrate_step_execution(cancellation_token)
+                    await self._orchestrate_step_execution(
+                        cancellation_token, first_step=True
+                    )
                     return
 
             # assume the task is the last user message
@@ -809,7 +813,9 @@ class Orchestrator(BaseGroupChatManager):
                     self._state.plan_str = str(user_plan)
                 # switch to execution mode
                 self._state.in_planning_mode = False
-                await self._orchestrate_step_execution(cancellation_token)
+                await self._orchestrate_step_execution(
+                    cancellation_token, first_step=True
+                )
                 return
             # user did not accept the plan yet
             else:
@@ -895,7 +901,7 @@ class Orchestrator(BaseGroupChatManager):
                 cancellation_token=cancellation_token,
             )
             self._state.in_planning_mode = False
-            await self._orchestrate_step_execution(cancellation_token)
+            await self._orchestrate_step_execution(cancellation_token, first_step=True)
 
     async def _orchestrate_step_execution(
         self, cancellation_token: CancellationToken, first_step: bool = False
@@ -950,33 +956,33 @@ class Orchestrator(BaseGroupChatManager):
         assert progress_ledger is not None
         # log the progress ledger
         await self._log_message_agentchat(dict_to_str(progress_ledger), internal=True)
+        if not first_step:
+            # Check for replans
+            need_to_replan = progress_ledger["need_to_replan"]["answer"]
+            replan_reason = progress_ledger["need_to_replan"]["reason"]
 
-        # Check for replans
-        need_to_replan = progress_ledger["need_to_replan"]["answer"]
-        replan_reason = progress_ledger["need_to_replan"]["reason"]
-
-        if need_to_replan and self._config.allow_for_replans:
-            # Replan
-            if self._config.max_replans is None:
-                await self._replan(replan_reason, cancellation_token)
-            elif self._state.n_replans < self._config.max_replans:
-                self._state.n_replans += 1
-                await self._replan(replan_reason, cancellation_token)
-                return
-            else:
+            if need_to_replan and self._config.allow_for_replans:
+                # Replan
+                if self._config.max_replans is None:
+                    await self._replan(replan_reason, cancellation_token)
+                elif self._state.n_replans < self._config.max_replans:
+                    self._state.n_replans += 1
+                    await self._replan(replan_reason, cancellation_token)
+                    return
+                else:
+                    await self._prepare_final_answer(
+                        f"We need to replan but max replan attempts reached: {replan_reason}.",
+                        cancellation_token,
+                    )
+                    return
+            elif need_to_replan:
                 await self._prepare_final_answer(
-                    f"We need to replan but max replan attempts reached: {replan_reason}.",
+                    f"The current plan failed to complete the task, we need a new plan to continue. {replan_reason}",
                     cancellation_token,
                 )
                 return
-        elif need_to_replan:
-            await self._prepare_final_answer(
-                f"The current plan failed to complete the task, we need a new plan to continue. {replan_reason}",
-                cancellation_token,
-            )
-            return
-        if progress_ledger["is_current_step_complete"]["answer"]:
-            self._state.current_step_idx += 1
+            if progress_ledger["is_current_step_complete"]["answer"]:
+                self._state.current_step_idx += 1
 
         if progress_ledger["progress_summary"] != "":
             self._state.information_collected += (
@@ -1093,7 +1099,7 @@ class Orchestrator(BaseGroupChatManager):
             await self._request_next_speaker(self._user_agent_topic, cancellation_token)
         else:
             self._state.in_planning_mode = False
-            await self._orchestrate_step_execution(cancellation_token)
+            await self._orchestrate_step_execution(cancellation_token, first_step=True)
 
     async def _prepare_final_answer(
         self,
