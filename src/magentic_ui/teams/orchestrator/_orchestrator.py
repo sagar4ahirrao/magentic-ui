@@ -996,19 +996,26 @@ class Orchestrator(BaseGroupChatManager):
             )
             return
 
-        # Broadcast the next step
-        new_instruction = self.get_agent_instruction(
-            progress_ledger["instruction_or_question"]["answer"],
-            progress_ledger["instruction_or_question"]["agent_name"],
+        current_step = self._state.plan[self._state.current_step_idx]
+        is_sentinel_step = (
+            isinstance(current_step, SentinelPlanStep) and self._config.sentinel_tasks
         )
-        message_to_send = TextMessage(
-            content=new_instruction, source=self._name, metadata={"internal": "yes"}
-        )
-        self._state.message_history.append(message_to_send)  # My copy
 
-        await self._publish_group_chat_message(
-            message_to_send.content, cancellation_token, internal=True
-        )
+        # Broadcast the next step
+        if not is_sentinel_step:
+            new_instruction = self.get_agent_instruction(
+                progress_ledger["instruction_or_question"]["answer"],
+                progress_ledger["instruction_or_question"]["agent_name"],
+            )
+            message_to_send = TextMessage(
+                content=new_instruction, source=self._name, metadata={"internal": "yes"}
+            )
+            self._state.message_history.append(message_to_send)  # My copy
+
+            await self._publish_group_chat_message(
+                message_to_send.content, cancellation_token, internal=True
+            )
+        # TODO: add sentinel step execution here if sentinel step
         json_step_execution = {
             "title": self._state.plan[self._state.current_step_idx].title,
             "index": self._state.current_step_idx,
@@ -1024,17 +1031,28 @@ class Orchestrator(BaseGroupChatManager):
         )
 
         # Request that the step be completed
-        valid_next_speaker: bool = False
-        next_speaker = progress_ledger["instruction_or_question"]["agent_name"]
-        for participant_name in self._agent_execution_names:
-            if participant_name == next_speaker:
-                await self._request_next_speaker(next_speaker, cancellation_token)
-                valid_next_speaker = True
-                break
-        if not valid_next_speaker:
-            raise ValueError(
-                f"Invalid next speaker: {next_speaker} from the ledger, participants are: {self._agent_execution_names}"
+        if not is_sentinel_step:
+            valid_next_speaker: bool = False
+            next_speaker = progress_ledger["instruction_or_question"]["agent_name"]
+            for participant_name in self._agent_execution_names:
+                if participant_name == next_speaker:
+                    await self._request_next_speaker(next_speaker, cancellation_token)
+                    valid_next_speaker = True
+                    break
+            if not valid_next_speaker:
+                raise ValueError(
+                    f"Invalid next speaker: {next_speaker} from the ledger, participants are: {self._agent_execution_names}"
+                )
+        else:
+            assert isinstance(current_step, SentinelPlanStep)
+            await self._log_message_agentchat(
+                f"Executing sentinel step: {current_step.title}",
+                metadata={"internal": "no", "type": "sentinel_start"},
             )
+            await self._execute_sentinel_step(current_step, cancellation_token)
+            # assume sentinel step is completed
+            self._state.current_step_idx += 1  # moves to the next step
+            await self._orchestrate_step(cancellation_token)
 
     async def _replan(self, reason: str, cancellation_token: CancellationToken) -> None:
         # Let's create a new plan
@@ -1285,6 +1303,7 @@ class Orchestrator(BaseGroupChatManager):
         # TODO: need to make a snapshot of the agent and then reset its state at the end
 
         # Forces the agent on a loop to check the condition until it is met or cancelled
+        idxx = 0
         while True:
             try:
                 # Check if task is cancelled
@@ -1320,12 +1339,22 @@ class Orchestrator(BaseGroupChatManager):
                         #     )
                         # )
                         # placeholder since other way broke with lazy init PR
-                        self._state.message_history.append(
-                            TextMessage(
-                                content="Currently on Bing.com",
-                                source=agent_name,
+
+                        idxx += 1
+                        if idxx == 3:
+                            self._state.message_history.append(
+                                TextMessage(
+                                    content="Currently on apple.com",
+                                    source=agent_name,
+                                )
                             )
-                        )
+                        else:
+                            self._state.message_history.append(
+                                TextMessage(
+                                    content="Currently on bing.com",
+                                    source=agent_name,
+                                )
+                            )
 
                 # No Action Agent Check
                 elif agent_name == "no_action_agent":
