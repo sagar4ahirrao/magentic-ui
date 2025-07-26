@@ -9,12 +9,12 @@ from .local_playwright_browser import LocalPlaywrightBrowser
 from .vnc_docker_playwright_browser import VncDockerPlaywrightBrowser
 
 
-def get_available_port() -> tuple[int, socket.socket]:
+def get_available_port(port: int = 6080) -> tuple[int, socket.socket]:
     """
     Get an available port on the local machine.
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", 0))
+    s.bind(("127.0.0.1", port))
     port = s.getsockname()[1]
     return port, s
 
@@ -28,7 +28,7 @@ def _get_docker_browser_resource_config(
     network_name: str = "my-network",
 ) -> Tuple[PlaywrightBrowser, int, int]:
     if playwright_port == -1:
-        playwright_port, sock = get_available_port()
+        playwright_port, sock = get_available_port(port=37367)
         sock.close()
 
     if headless:
@@ -38,7 +38,7 @@ def _get_docker_browser_resource_config(
         )
     else:
         if novnc_port == -1:
-            novnc_port, sock = get_available_port()
+            novnc_port, sock = get_available_port(port=6080)
             sock.close()
 
         browser = VncDockerPlaywrightBrowser(

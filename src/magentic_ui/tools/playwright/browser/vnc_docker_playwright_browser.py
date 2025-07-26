@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from pathlib import Path
 import secrets
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 
 from .base_playwright_browser import DockerPlaywrightBrowser
 from ...._docker import BROWSER_IMAGE
+from playwright.async_api import async_playwright
 
 
 # Configure logging
@@ -36,152 +38,88 @@ class VncDockerPlaywrightBrowserConfig(BaseModel):
 class VncDockerPlaywrightBrowser(
     DockerPlaywrightBrowser, Component[VncDockerPlaywrightBrowserConfig]
 ):
-    f"""
+    """
     A Docker-based Playwright browser implementation with VNC support for visual interaction.
     Provides both programmatic browser control via Playwright and visual access through noVNC.
-
-    Args:
-        bind_dir (Path): Directory to bind mount into the container for file access.
-        image (str, optional): Docker image name for the VNC-enabled browser. Default: "{BROWSER_IMAGE}".
-        playwright_port (int, optional): Port for Playwright WebSocket connection. Default: 37367.
-        playwright_websocket_path (str | None, optional): Custom WebSocket path. If None, generates random path.
-        novnc_port (int, optional): Port for noVNC web interface. Default: 6080.
-        inside_docker (bool, optional): Whether the client is running inside Docker. Default: True.
-        network_name (str, optional): Docker network name for container communication. Default: `my-network`.
-
-    Properties:
-        browser_address (str): WebSocket URL for Playwright connection.
-        vnc_address (str): HTTP URL for noVNC web interface.
-
-    Example:
-        ```python
-        browser = VncDockerPlaywrightBrowser(
-            bind_dir=Path("./workspace"),
-            playwright_port=37367,
-            novnc_port=6080
-        )
-        await browser.start()
-        # Access browser programmatically via Playwright
-        # Access visual interface via noVNC at browser.vnc_address
-        await browser.close()
-        ```
-
-    Note:
-        Requires the Docker image to be available locally.
+    All sessions share the same container and ports, but should use separate browser contexts/pages.
     """
 
     component_config_schema = VncDockerPlaywrightBrowserConfig
     component_type = "other"
+
+    # Static/shared settings
+    DEFAULT_PLAYWRIGHT_PORT = 37367
+    DEFAULT_NOVNC_PORT = 6080
+    DEFAULT_WS_PATH = "ws"
+    DEFAULT_CONTAINER_NAME = "magentic-ui-vnc-browser-shared"
 
     def __init__(
         self,
         *,
         bind_dir: Path,
         image: str = BROWSER_IMAGE,
-        playwright_port: int = 37367,
+        playwright_port: int = None,
         playwright_websocket_path: str | None = None,
-        novnc_port: int = 6080,
+        novnc_port: int = None,
         inside_docker: bool = True,
         network_name: str = "my-network",
     ):
         super().__init__()
         self._bind_dir = bind_dir
         self._image = image
-        self._playwright_port = playwright_port
-        self._novnc_port = novnc_port
-        self._playwright_websocket_path = (
-            playwright_websocket_path or secrets.token_hex(16)
-        )
+
+        # Use environment variables if set, otherwise defaults
+        self._playwright_port = int(os.getenv("MAGENTIC_UI_PLAYWRIGHT_PORT", playwright_port or self.DEFAULT_PLAYWRIGHT_PORT))
+        self._novnc_port = int(os.getenv("MAGENTIC_UI_NOVNC_PORT", novnc_port or self.DEFAULT_NOVNC_PORT))
+        self._playwright_host = os.getenv("MAGENTIC_UI_PLAYWRIGHT_HOST", "127.0.0.1")
+        self._novnc_host = os.getenv("MAGENTIC_UI_NOVNC_HOST", "127.0.0.1")
+        self._playwright_websocket_path = playwright_websocket_path or self.DEFAULT_WS_PATH
         self._inside_docker = inside_docker
         self._network_name = network_name
-        self._hostname = (
-            f"magentic-ui-vnc-browser_{self._playwright_websocket_path}_{self._novnc_port}"
-            if inside_docker
-            else "127.0.0.1"
-        )
-        self._docker_name = f"magentic-ui-vnc-browser_{self._playwright_websocket_path}_{self._novnc_port}"
-
-    def _get_available_port(self) -> tuple[int, socket.socket]:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", 0))
-        port = s.getsockname()[1]
-        return port, s
-
-    # TODO: This is a temporary solution to avoid port conflicts. Ideally we should allow docker to tell us which sockets to use
-    def _generate_new_browser_address(self) -> None:
-        """
-        Generate new ports for Playwright and noVNC.
-        """
-        self._playwright_port, playwright_sock = self._get_available_port()
-        self._novnc_port, novnc_sock = self._get_available_port()
-        self._hostname = (
-            f"magentic-ui-vnc-browser_{self._playwright_websocket_path}_{self._novnc_port}"
-            if self._inside_docker
-            else "127.0.0.1"
-        )
-        self._docker_name = f"magentic-ui-vnc-browser_{self._playwright_websocket_path}_{self._novnc_port}"
-        playwright_sock.close()
-        novnc_sock.close()
 
     @property
     def browser_address(self) -> str:
         """
         Get the address of the Playwright browser.
         """
-        return f"ws://{self._hostname}:{self._playwright_port}/{self._playwright_websocket_path}"
+        return f"ws://{self._playwright_host}:{self._playwright_port}/{self._playwright_websocket_path}"
 
     @property
     def vnc_address(self) -> str:
         """
         Get the address of the noVNC server.
         """
-        return f"http://{self._hostname}:{self._novnc_port}/vnc.html"
+        return f"http://{self._novnc_host}:{self._novnc_port}/vnc.html"
 
     @property
     def novnc_port(self) -> int:
-        """
-        Get the address of the noVNC server.
-        """
         return self._novnc_port
 
     @property
     def playwright_port(self) -> int:
-        """
-        Get the address of the noVNC server.
-        """
         return self._playwright_port
 
-    async def create_container(self) -> Container:
+    async def _start(self) -> None:
         """
-        Start a headless Playwright browser using the official Playwright Docker image.
+        Override: Do not start or check Docker containers at runtime.
+        Assume browser and VNC are already running and accessible via env vars.
         """
-        logger.info(
-            f"Starting headless Playwright browser on port {self._playwright_port}..."
-        )
+        logger.info("Skipping Docker container start. Using environment variables for browser/VNC connection.")
+        # Do not set self._container or call any Docker methods.
+        logger.info(f"Connecting to remote Playwright server at {self.browser_address}")
+        self._playwright = await async_playwright().start()
+        self._browser = await self._playwright.chromium.connect(self.browser_address)
+        self._context = await self._browser.new_context()
+    
+    async def create_container(self) -> None:
+        """
+        Skipped: Do not create or check Docker containers at runtime.
+        """
+        logger.info("Skipping Docker container creation/check. Using environment variables for browser/VNC connection.")
+        return None
 
-        client = docker.from_env()
-
-        return await asyncio.to_thread(
-            client.containers.create,
-            name=self._docker_name,
-            image=self._image,
-            detach=True,
-            auto_remove=True,
-            network=self._network_name if self._inside_docker else None,
-            ports={
-                f"{self._playwright_port}/tcp": self._playwright_port,
-                f"{self._novnc_port}/tcp": self._novnc_port,
-            },
-            volumes={
-                str(self._bind_dir.resolve()): {"bind": "/workspace", "mode": "rw"}
-            },
-            environment={
-                "PLAYWRIGHT_WS_PATH": self._playwright_websocket_path,
-                "PLAYWRIGHT_PORT": str(self._playwright_port),
-                "NO_VNC_PORT": str(self._novnc_port),
-            },
-        )
-
+    def _generate_new_browser_address(self) -> None:
+        pass
     def _to_config(self) -> VncDockerPlaywrightBrowserConfig:
         return VncDockerPlaywrightBrowserConfig(
             bind_dir=self._bind_dir,
