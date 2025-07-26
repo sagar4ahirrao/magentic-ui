@@ -54,21 +54,14 @@ class VncDockerPlaywrightBrowser(
     DEFAULT_CONTAINER_NAME = "magentic-ui-vnc-browser-shared"
 
     def __init__(
-        self,
-        *,
-        bind_dir: Path,
-        image: str = BROWSER_IMAGE,
-        playwright_port: int = None,
-        playwright_websocket_path: str | None = None,
-        novnc_port: int = None,
-        inside_docker: bool = True,
-        network_name: str = "my-network",
+        self, *, bind_dir: Path, image: str = BROWSER_IMAGE, playwright_port: int = None,
+                 playwright_websocket_path: str | None = None, novnc_port: int = None,
+                 inside_docker: bool = True, network_name: str = "my-network"
     ):
         super().__init__()
         self._bind_dir = bind_dir
         self._image = image
 
-        # Use environment variables if set, otherwise defaults
         self._playwright_port = int(os.getenv("MAGENTIC_UI_PLAYWRIGHT_PORT", playwright_port or self.DEFAULT_PLAYWRIGHT_PORT))
         self._novnc_port = int(os.getenv("MAGENTIC_UI_NOVNC_PORT", novnc_port or self.DEFAULT_NOVNC_PORT))
         self._playwright_host = os.getenv("MAGENTIC_UI_PLAYWRIGHT_HOST", "127.0.0.1")
@@ -77,19 +70,27 @@ class VncDockerPlaywrightBrowser(
         self._inside_docker = inside_docker
         self._network_name = network_name
 
+        # Add these lines:
+        self._playwright_ws_scheme = os.getenv("MAGENTIC_UI_PLAYWRIGHT_WS_SCHEME", "ws")
+        self._novnc_scheme = os.getenv("MAGENTIC_UI_NOVNC_SCHEME", "http")
+
     @property
     def browser_address(self) -> str:
         """
         Get the address of the Playwright browser.
         """
-        return f"ws://{self._playwright_host}:{self._playwright_port}/{self._playwright_websocket_path}"
+        return f"{self._playwright_ws_scheme}://{self._playwright_host}:{self._playwright_port}/{self._playwright_websocket_path}"
 
     @property
     def vnc_address(self) -> str:
         """
         Get the address of the noVNC server.
         """
-        return f"http://{self._novnc_host}:{self._novnc_port}/vnc.html"
+        port = self._novnc_port
+        # If using standard HTTPS, don't append :443
+        if self._novnc_scheme == "https" and str(port) == "443":
+            return f"{self._novnc_scheme}://{self._novnc_host}/vnc.html"
+        return f"{self._novnc_scheme}://{self._novnc_host}:{port}/vnc.html"
 
     @property
     def novnc_port(self) -> int:

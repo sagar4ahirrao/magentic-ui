@@ -75,11 +75,9 @@ const BrowserIframe: React.FC<BrowserIframeProps> = ({
   }
 
   // Build VNC URL with parameters
-  const vncUrl = `http://${finalServerUrl}:${novncPort}/vnc.html?autoconnect=true&resize=${
-    scaling === "remote" ? "remote" : "scale"
-  }&show_dot=true&scaling=${scaling}&quality=${quality}&compression=0&view_only=${
-    viewOnly ? 1 : 0
-  }`;
+  const vncUrl = `${finalServerUrl}/vnc.html?autoconnect=true&resize=${scaling === "remote" ? "remote" : "scale"
+    }&show_dot=true&scaling=${scaling}&quality=${quality}&compression=0&view_only=${viewOnly ? 1 : 0
+    }`;
 
   return (
     <div
