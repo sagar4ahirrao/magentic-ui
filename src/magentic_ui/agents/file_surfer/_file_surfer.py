@@ -66,7 +66,7 @@ class FileSurferConfig(BaseModel):
     model_client: ComponentModel
     description: str | None = None
     code_executor: ComponentModel | None = None
-    use_local_executor: bool = False
+    use_local_executor: bool = True
 
 
 class FileSurfer(BaseChatAgent, Component[FileSurferConfig]):
@@ -133,7 +133,7 @@ class FileSurfer(BaseChatAgent, Component[FileSurferConfig]):
         work_dir: Path | str = "/workspace",
         bind_dir: Path | str | None = None,
         code_executor: Optional[CodeExecutor] = None,
-        use_local_executor: bool = False,
+        use_local_executor: bool = True,
         approval_guard: BaseApprovalGuard | None = None,
         save_converted_files: bool = False,
     ) -> None:

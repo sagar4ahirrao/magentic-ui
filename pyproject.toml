@@ -48,6 +48,9 @@ dependencies = [
     "pyyaml",
     "html2text",
     "psutil",
+    "requests",
+    "beautifulsoup4",
+    "markitdown[all]~=0.1.1",
 ]
 
 [project.urls]
@@ -60,6 +63,10 @@ eval = [
     "huggingface_hub",
     "pandas",
     "scipy",
+    "numpy",
+    "scikit-learn",
+    "matplotlib",
+    "pillow",
 ]
 
 azure = [

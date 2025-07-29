@@ -25,9 +25,7 @@ COPY pyproject.toml uv.lock README.md ./
 
 
 # Install Python dependencies (editable mode, no venv)
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir magentic-ui magentic-ui[azure] && \
-    pip install -e .
+RUN pip install --upgrade pip && pip install -e . && pip install .[eval,azure,ollama]
 
 # Clean up build dependencies
 RUN apt-get purge -y build-essential && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*

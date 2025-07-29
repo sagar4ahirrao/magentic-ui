@@ -365,7 +365,7 @@ class CoderAgent(BaseChatAgent, Component[CoderAgentConfig]):
         code_executor: Optional[CodeExecutor] = None,
         work_dir: Path | str | None = None,
         bind_dir: Path | str | None = None,
-        use_local_executor: bool = False,
+        use_local_executor: bool = True,
         approval_guard: BaseApprovalGuard | None = None,
     ) -> None:
         """Initialize the CoderAgent.
