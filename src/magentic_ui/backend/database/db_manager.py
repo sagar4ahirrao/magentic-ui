@@ -223,15 +223,29 @@ class DatabaseManager:
 
         with Session(self.engine) as session:
             try:
-                existing_model = session.exec(
-                    select(model_class).where(model_class.id == model.id)
-                ).first()
+                # Special handling for Settings: ensure config is a dict before saving
+                if model_class.__name__ == "Settings" and not isinstance(model.config, dict):
+                    if hasattr(model.config, "model_dump"):
+                        model.config = model.config.model_dump()
+                    elif hasattr(model.config, "dict"):
+                        model.config = model.config.dict()
+                # Special handling for Settings: match on user_id if id is None
+                if model_class.__name__ == "Settings" and getattr(model, "id", None) is None:
+                    existing_model = session.exec(
+                        select(model_class).where(model_class.user_id == model.user_id)
+                    ).first()
+                else:
+                    existing_model = session.exec(
+                        select(model_class).where(model_class.id == model.id)
+                    ).first()
                 if existing_model:
-                    model.updated_at = datetime.now()
                     for key, value in model.model_dump().items():
+                        if key == "id":
+                            continue
                         setattr(existing_model, key, value)
-                    model = existing_model  # Use the updated existing model
-                    session.add(model)
+                    existing_model.updated_at = datetime.now()
+                    session.add(existing_model)
+                    model = existing_model  # Ensure model points to the updated instance with a valid id
                 else:
                     session.add(model)
                 session.commit()
