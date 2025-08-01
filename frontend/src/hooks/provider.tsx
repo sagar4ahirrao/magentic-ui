@@ -31,10 +31,10 @@ const Provider = ({ children }: any) => {
   );
 
   const logout = () => {
-    // setUser(null);
-    // eraseCookie(cookie_name);
-    console.log("Please implement your own logout logic");
-    message.info("Please implement your own logout logic");
+    setUserState(null);
+    localStorage.removeItem("user_email");
+    localStorage.removeItem("user_data");
+    message.success("Logged out successfully");
   };
 
   const updateDarkMode = (darkMode: string) => {
@@ -42,16 +42,14 @@ const Provider = ({ children }: any) => {
     setLocalStorage("darkmode", darkMode, false);
   };
 
-  // Modify logic here to add your own authentication
-  const initUser = {
-    name: "Guest User",
-    email: getLocalStorage("user_email") || "guestuser@gmail.com",
-    username: "guestuser",
-  };
+  // Initialize user from localStorage or set to null for authentication
+  const storedUserData = getLocalStorage("user_data", true);
+  const initUser = storedUserData || null;
 
   const setUser = (user: IUser | null) => {
     if (user?.email) {
       setLocalStorage("user_email", user.email, false);
+      setLocalStorage("user_data", user, true);
     }
     setUserState(user);
   };
@@ -59,13 +57,9 @@ const Provider = ({ children }: any) => {
   const [userState, setUserState] = useState<IUser | null>(initUser);
 
   React.useEffect(() => {
-    const storedEmail = getLocalStorage("user_email");
-    if (storedEmail) {
-      setUserState((prevUser) => ({
-        ...prevUser,
-        email: storedEmail,
-        name: storedEmail,
-      }));
+    const storedUserData = getLocalStorage("user_data", true);
+    if (storedUserData) {
+      setUserState(storedUserData);
     }
   }, []);
 

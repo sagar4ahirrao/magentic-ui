@@ -1,4 +1,4 @@
-# Dockerfile for Magentic-UI (see README.md for details)
+# Dockerfile for Magentic-UI
 FROM python:3.12-slim
 
 # Set working directory
@@ -8,6 +8,10 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
     rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV MAGENTIC_UI_PLAYWRIGHT_PORT=37367
 ENV MAGENTIC_UI_NOVNC_PORT=6080

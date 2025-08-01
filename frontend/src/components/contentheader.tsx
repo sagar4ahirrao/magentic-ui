@@ -8,7 +8,7 @@ import SignInModal from "./signin";
 import SettingsModal from "./settings/SettingsModal";
 import logo from "../assets/logo.svg";
 import { Button } from "./common/Button";
-
+import UserProfile from "./auth/UserProfile";
 type ContentHeaderProps = {
   onMobileMenuToggle: () => void;
   isMobileMenuOpen: boolean;
@@ -64,48 +64,24 @@ const ContentHeader = ({
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <img src={logo} alt="Magentic-UI Logo" className="h-10 w-10" />
-            <div className="text-primary text-2xl font-bold">Magentic-UI</div>
+            <img src={logo} alt="Browser-Agent Logo" className="h-10 w-10" />
+            <div className="text-primary text-2xl font-bold">Browser-Agent</div>
           </div>
         </div>
 
-        {/* User Profile and Settings */}
-        <div className="flex items-center space-x-4">
-          {/* User Profile */}
-          {user && (
-            <Tooltip title="View or update your profile">
-              <div
-                className="flex items-center space-x-2 cursor-pointer"
-                onClick={() => setIsEmailModalOpen(true)}
-              >
-                {user.avatar_url ? (
-                  <img
-                    className="h-8 w-8 rounded-full"
-                    src={user.avatar_url}
-                    alt={user.name}
-                  />
-                ) : (
-                  <div className="bg-blue-400 h-8 w-8 rounded-full flex items-center justify-center text-gray-800 font-semibold hover:text-message">
-                    {user.name?.[0]}
-                  </div>
-                )}
-              </div>
-            </Tooltip>
-          )}
-
-          {/* Settings Button */}
-          <div className="text-primary">
-            <Tooltip title="Settings">
-              <Button
-                variant="tertiary"
-                size="sm"
-                icon={<Settings className="h-8 w-8" />}
-                onClick={() => setIsSettingsOpen(true)}
-                className="!px-0 transition-colors hover:text-accent"
-                aria-label="Settings"
-              />
-            </Tooltip>
-          </div>
+        {/* Settings Button - User Profile is handled by UserProfile component */}
+        <div className="text-primary">
+          <Tooltip title="Settings">
+            {/* <Button
+              variant="tertiary"
+              size="sm"
+              icon={<Settings className="h-6 w-6" />}
+              onClick={() => setIsSettingsOpen(true)}
+              className="!px-2 transition-colors hover:text-accent"
+              aria-label="Settings"
+            /> */}
+        <UserProfile />
+          </Tooltip>
         </div>
       </div>
 

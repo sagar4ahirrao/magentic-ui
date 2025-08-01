@@ -4,6 +4,8 @@ import { useConfigStore } from "../hooks/store";
 import "antd/dist/reset.css";
 import { ConfigProvider, theme } from "antd";
 import { SessionManager } from "./views/manager";
+import AuthGuard from "./auth/AuthGuard";
+import UserProfile from "./auth/UserProfile";
 
 const classNames = (...classes: (string | undefined | boolean)[]) => {
   return classes.filter(Boolean).join(" ");
@@ -34,16 +36,7 @@ const MagenticUILayout = ({
   const { isExpanded } = sidebar;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  // Mimic sign-in: if no user or user.email, set default user and localStorage
-  React.useEffect(() => {
-    if (!user?.email) {
-      const defaultEmail = "default";
-      setUser({ ...user, email: defaultEmail, name: defaultEmail });
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("user_email", defaultEmail);
-      }
-    }
-  }, [user, setUser]);
+  // Remove the auto-login effect - let AuthGuard handle authentication
 
   // Close mobile menu on route change
   React.useEffect(() => {
@@ -58,6 +51,11 @@ const MagenticUILayout = ({
 
   const layoutContent = (
     <div className="h-screen flex">
+      {/* Header with user profile */}
+      {/* <div className="absolute top-4 right-4 z-50 max-w-xs">
+        <UserProfile />
+      </div> */}
+      
       {/* Content area */}
       <div
         className={classNames(
@@ -84,7 +82,7 @@ const MagenticUILayout = ({
           </main>
         </ConfigProvider>
         <div className="text-sm text-primary mt-2 mb-2 text-center">
-          Magentic-UI can make mistakes. Please monitor its work and intervene if
+          Browser-Agent can make mistakes. Please monitor its work and intervene if
           necessary.
         </div>
       </div>
@@ -93,18 +91,17 @@ const MagenticUILayout = ({
 
   if (restricted) {
     return (
-      <appContext.Consumer>
-        {(context: any) => {
-          if (context.user) {
-            return layoutContent;
-          }
-          return null;
-        }}
-      </appContext.Consumer>
+      <AuthGuard requireAuth={true}>
+        {layoutContent}
+      </AuthGuard>
     );
   }
 
-  return layoutContent;
+  return (
+    <AuthGuard requireAuth={true}>
+      {layoutContent}
+    </AuthGuard>
+  );
 };
 
 export default MagenticUILayout;

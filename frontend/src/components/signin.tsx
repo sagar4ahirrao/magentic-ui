@@ -26,7 +26,7 @@ const SignInModal = ({ isVisible, onClose }: SignInModalProps) => {
       return;
     }
     setUser({ ...user, email: trimmedEmail, name: trimmedEmail });
-    setLocalStorage("user_email", trimmedEmail);
+    setLocalStorage("user_email", trimmedEmail, false);
     onClose();
   };
 
