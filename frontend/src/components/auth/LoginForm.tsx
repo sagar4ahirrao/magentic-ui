@@ -133,7 +133,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           </Form.Item>
         </Form>
 
-        <div className="mt-6">
+        {/* <div className="mt-6">
           <Text className="block text-center mb-4 text-secondary">
             Or try with demo credentials:
           </Text>
@@ -163,7 +163,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               Login as Guest (guest/guest123)
             </Button>
           </Space>
-        </div>
+        </div> */}
       </Card>
     </div>
   );
